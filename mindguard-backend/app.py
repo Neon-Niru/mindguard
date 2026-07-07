@@ -1,8 +1,15 @@
 from flask import Flask
 from flask_cors import CORS
+from flask_bcrypt import Bcrypt
 
 from config import Config
 from database.db import db
+from models.user import User
+from models.planner import PlannerTask
+from models.interview import InterviewSession
+from models.assessment import BurnoutAssessment
+from models.recovery_goal import RecoveryGoal
+from models.settings import UserSettings
 
 from routes.auth import auth_bp
 from routes.dashboard import dashboard_bp
@@ -10,8 +17,10 @@ from routes.planner import planner_bp
 from routes.progress import progress_bp
 from routes.settings import settings_bp
 from routes.interview import interview_bp
+from routes.assessment import assessment_bp
 
 app = Flask(__name__)
+bcrypt = Bcrypt(app)
 app.config.from_object(Config)
 
 CORS(app)
@@ -24,6 +33,7 @@ app.register_blueprint(planner_bp)
 app.register_blueprint(progress_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(interview_bp)
+app.register_blueprint(assessment_bp)
 
 @app.route("/")
 def home():

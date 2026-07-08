@@ -1,44 +1,32 @@
 from flask import Blueprint, jsonify
+from models.assessment import BurnoutAssessment
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
-@dashboard_bp.route("/dashboard", methods=["GET"])
-def dashboard():
+@dashboard_bp.route("/dashboard/<int:user_id>")
+def dashboard(user_id):
+
+    latest = BurnoutAssessment.query.filter_by(
+        user_id=user_id
+    ).order_by(
+        BurnoutAssessment.assessment_id.desc()
+    ).first()
+
+    if latest is None:
+        return jsonify({
+            "message": "No assessment found"
+        })
 
     return jsonify({
 
-        "wellness_score": 82,
+        "burnout_score": latest.burnout_score,
+        "wellness_score": latest.wellness_score,
+        "risk_level": latest.risk_level,
 
-        "burnout_score": 18,
+        "sleep": latest.sleep_score,
+        "stress": latest.stress_score,
+        "motivation": latest.motivation_score,
+        "productivity": latest.productivity_score,
 
-        "risk_level": "Low",
-
-        "sleep_summary": "7.5 hours",
-
-        "mood_summary": "Positive",
-
-        "stress_summary": "Moderate",
-
-        "productivity_summary": "Good",
-
-        "planner_progress": 60,
-
-        "recovery_goals": [
-
-            "Sleep before 11 PM",
-
-            "Take one study break every hour",
-
-            "Walk for 20 minutes"
-
-        ],
-
-        "previous_checkin":{
-
-            "burnout_score":24,
-
-            "wellness_score":76
-
-        }
-
+        "focus": latest.recovery_focus_areas
     })

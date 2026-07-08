@@ -1,77 +1,78 @@
-from flask import Blueprint, request, jsonify
+from flask import Flask
+from flask_cors import CORS
+
+from config import Config
+
 from database.db import db
+
+from utils.extensions import bcrypt
+
+
+# Models
 from models.user import User
-from flask_bcrypt import Bcrypt
-
-bcrypt = Bcrypt()
-
-auth_bp = Blueprint("auth", __name__)
-
-# -------------------------
-# Register
-# -------------------------
-
-@auth_bp.route("/register", methods=["POST"])
-def register():
-
-    data = request.get_json()
-
-    full_name = data.get("full_name")
-    email = data.get("email")
-    password = data.get("password")
-
-    if User.query.filter_by(email=email).first():
-        return jsonify({"error": "Email already exists"}), 400
-
-    hashed = bcrypt.generate_password_hash(password).decode("utf-8")
-
-    user = User(
-        full_name=full_name,
-        email=email,
-        password_hash=hashed
-    )
-
-    db.session.add(user)
-    db.session.commit()
-
-    return jsonify({"message": "User created"})
+from models.planner import PlannerTask
+from models.interview import InterviewSession
+from models.assessment import BurnoutAssessment
+from models.recovery_goal import RecoveryGoal
+from models.settings import UserSettings
 
 
-# -------------------------
-# Login
-# -------------------------
-
-@auth_bp.route("/login", methods=["POST"])
-def login():
-
-    data = request.get_json()
-
-    email = data.get("email")
-    password = data.get("password")
-
-    user = User.query.filter_by(email=email).first()
-
-    if user is None:
-        return jsonify({"error":"Invalid email or password"}),401
-
-    if not bcrypt.check_password_hash(user.password_hash,password):
-        return jsonify({"error":"Invalid email or password"}),401
-
-    return jsonify({
-        "message":"Login Successful",
-        "user_id":user.user_id,
-        "full_name":user.full_name,
-        "email":user.email
-    })
+# Routes
+from routes.auth import auth_bp
+from routes.report import report_bp
+from routes.dashboard import dashboard_bp
+from routes.planner import planner_bp
+from routes.progress import progress_bp
+from routes.settings import settings_bp
+from routes.interview import interview_bp
+from routes.assessment import assessment_bp
 
 
-# -------------------------
-# Logout
-# -------------------------
 
-@auth_bp.route("/logout", methods=["POST"])
-def logout():
+app = Flask(__name__)
 
-    return jsonify({
-        "message":"Logged out successfully"
-    })
+app.config.from_object(Config)
+
+
+CORS(app)
+
+
+db.init_app(app)
+
+bcrypt.init_app(app)
+
+
+
+app.register_blueprint(auth_bp)
+app.register_blueprint(report_bp)
+app.register_blueprint(dashboard_bp)
+app.register_blueprint(planner_bp)
+app.register_blueprint(progress_bp)
+app.register_blueprint(settings_bp)
+app.register_blueprint(interview_bp)
+app.register_blueprint(assessment_bp)
+
+
+
+@app.route("/")
+def home():
+
+    return {
+
+        "status": "running",
+
+        "project": "MindGuard AI"
+
+    }
+
+
+
+with app.app_context():
+
+    db.create_all()
+
+
+
+if __name__ == "__main__":
+
+    app.run(debug=True)

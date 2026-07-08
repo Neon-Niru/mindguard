@@ -1,37 +1,27 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 from database.db import db
 from models.planner import PlannerTask
 
 planner_bp = Blueprint("planner", __name__)
 
+# ---------------- GET ALL TASKS ----------------
 
-@planner_bp.route("/planner", methods=["GET"])
-def get_tasks():
+@planner_bp.route("/planner/<int:user_id>")
+def planner(user_id):
 
-    tasks = PlannerTask.query.all()
+    tasks = PlannerTask.query.filter_by(user_id=user_id).all()
 
-    output = []
-
-    for t in tasks:
-
-        output.append({
-
+    return jsonify([
+        {
             "task_id": t.task_id,
-
             "title": t.title,
-
-            "description": t.description,
-
-            "category": t.category,
-
-            "due_date": t.due_date,
-
             "completed": t.completed
+        }
+        for t in tasks
+    ])
 
-        })
 
-    return jsonify(output)
-
+# ---------------- ADD TASK ----------------
 
 @planner_bp.route("/planner", methods=["POST"])
 def add_task():
@@ -39,74 +29,30 @@ def add_task():
     data = request.get_json()
 
     task = PlannerTask(
-
-        user_id=1,
-
+        user_id=data["user_id"],
         title=data["title"],
-
-        description=data.get("description"),
-
-        category=data.get("category"),
-
-        due_date=data.get("due_date")
-
+        completed=False
     )
 
     db.session.add(task)
-
-    db.session.commit()
-
-    return jsonify({"message":"Task Added"})
-
-
-@planner_bp.route("/planner/<int:id>", methods=["DELETE"])
-def delete_task(id):
-
-    task = PlannerTask.query.get(id)
-
-    if task is None:
-
-        return jsonify({"error":"Task not found"}),404
-
-    db.session.delete(task)
-
-    db.session.commit()
-
-    return jsonify({"message":"Task Deleted"})
-@planner_bp.route("/planner/<int:id>", methods=["PUT"])
-def update_task(id):
-
-    task = PlannerTask.query.get(id)
-
-    if task is None:
-        return jsonify({"error":"Task not found"}),404
-
-    data = request.get_json()
-
-    task.title = data.get("title", task.title)
-    task.description = data.get("description", task.description)
-    task.category = data.get("category", task.category)
-    task.due_date = data.get("due_date", task.due_date)
-
     db.session.commit()
 
     return jsonify({
-        "message":"Task Updated"
+        "message": "Task Added"
     })
 
 
-@planner_bp.route("/planner/<int:id>/complete", methods=["PUT"])
+# ---------------- COMPLETE TASK ----------------
+
+@planner_bp.route("/planner/<int:id>", methods=["PUT"])
 def complete_task(id):
 
-    task = PlannerTask.query.get(id)
-
-    if task is None:
-        return jsonify({"error":"Task not found"}),404
+    task = PlannerTask.query.get_or_404(id)
 
     task.completed = True
 
     db.session.commit()
 
     return jsonify({
-        "message":"Task Completed"
+        "message": "Completed"
     })

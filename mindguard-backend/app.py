@@ -12,6 +12,7 @@ from models.recovery_goal import RecoveryGoal
 from models.settings import UserSettings
 
 from routes.auth import auth_bp
+from routes.report import report_bp
 from routes.dashboard import dashboard_bp
 from routes.planner import planner_bp
 from routes.progress import progress_bp
@@ -28,6 +29,7 @@ CORS(app)
 db.init_app(app)
 
 app.register_blueprint(auth_bp)
+app.register_blueprint(report_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(planner_bp)
 app.register_blueprint(progress_bp)

@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { User, Lock, Bell, Palette, Bot, ShieldCheck, LogOut, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import PageHeader from '../components/ui/PageHeader.jsx'
 import GlassCard from '../components/ui/GlassCard.jsx'
 import Button from '../components/ui/Button.jsx'
 import TextField from '../components/ui/TextField.jsx'
-import { currentUser } from '../data/mockData.js'
+import { useAuth } from '../context/AuthContext.jsx'
+import { settings as settingsApi } from '../services/api'
 
 function Toggle({ checked, onChange }) {
   return (
@@ -44,11 +45,35 @@ const sections = [
 
 export default function Settings() {
   const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const [active, setActive] = useState('profile')
   const [notifs, setNotifs] = useState({ checkins: true, planner: true, weekly: false })
   const [darkMode, setDarkMode] = useState(true)
   const [aiTone, setAiTone] = useState('supportive')
   const [dataSharing, setDataSharing] = useState(false)
+
+  useEffect(() => {
+    settingsApi.get()
+      .then((data) => {
+        setDarkMode(data.theme === 'dark')
+        setNotifs({ checkins: data.notifications, planner: data.notifications, weekly: false })
+        setDataSharing(data.privacy_settings !== 'private')
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    settingsApi.save({
+      theme: darkMode ? 'dark' : 'light',
+      notifications: notifs.checkins || notifs.planner,
+      privacy_settings: dataSharing ? 'shared' : 'private',
+    }).catch(() => {})
+  }, [notifs, darkMode, dataSharing])
+
+  function handleLogout() {
+    logout()
+    navigate('/login')
+  }
 
   return (
     <div>
@@ -70,7 +95,7 @@ export default function Settings() {
               </button>
             ))}
             <button
-              onClick={() => navigate('/login')}
+              onClick={handleLogout}
               className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm text-rose-300/80 hover:text-rose-300 hover:bg-white/5 transition-colors mt-1 lg:mt-2 lg:border-t lg:border-white/10 lg:pt-3.5"
             >
               <LogOut size={16} />
@@ -85,16 +110,14 @@ export default function Settings() {
               <h3 className="font-medium mb-5">Profile</h3>
               <div className="flex items-center gap-4 mb-7">
                 <div className="w-16 h-16 rounded-full bg-brand-gradient flex items-center justify-center text-xl font-semibold">
-                  {currentUser.initials}
+                  {(user?.full_name || 'U')[0]}
                 </div>
                 <Button variant="secondary">Change Photo</Button>
               </div>
               <div className="grid sm:grid-cols-2 gap-5 max-w-xl">
-                <TextField label="Full name" defaultValue={currentUser.name} />
-                <TextField label="Grade" defaultValue={currentUser.grade} />
-                <TextField label="Email" type="email" defaultValue="aditi@school.edu" className="sm:col-span-2" />
+                <TextField label="Full name" defaultValue={user?.full_name || ''} />
+                <TextField label="Email" type="email" defaultValue={user?.email || ''} className="sm:col-span-2" />
               </div>
-              <Button variant="primary" className="mt-7">Save Changes</Button>
             </div>
           )}
 
@@ -103,7 +126,7 @@ export default function Settings() {
               <h3 className="font-medium mb-5">Password</h3>
               <div className="space-y-5 max-w-md">
                 <TextField label="Current password" type="password" placeholder="••••••••" />
-                <TextField label="New password" type="password" placeholder="At least 8 characters" />
+                <TextField label="New password" type="password" placeholder="At least 6 characters" />
                 <TextField label="Confirm new password" type="password" placeholder="••••••••" />
               </div>
               <Button variant="primary" className="mt-7">Update Password</Button>

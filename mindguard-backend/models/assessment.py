@@ -108,17 +108,20 @@ class BurnoutAssessment(db.Model):
     # Detailed engine output
 
     primary_contributors = db.Column(
-        db.JSON
+        db.JSON,
+        default=list
     )
 
 
     recovery_focus_areas = db.Column(
-        db.JSON
+        db.JSON,
+        default=list
     )
 
 
     category_summaries = db.Column(
-        db.JSON
+        db.JSON,
+        default=dict
     )
 
 

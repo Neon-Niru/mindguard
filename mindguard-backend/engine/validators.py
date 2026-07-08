@@ -52,7 +52,7 @@ def validate_payload(data: dict):
 
             if expected_type:
 
-                if expected_type == "number":
+                if expected_type in ("continuous", "percentage"):
 
                     if not isinstance(value, (int, float)):
                         raise ValidationError(
@@ -60,7 +60,7 @@ def validate_payload(data: dict):
                         )
 
 
-                elif expected_type == "string":
+                elif expected_type == "ordinal":
 
                     if not isinstance(value, str):
                         raise ValidationError(

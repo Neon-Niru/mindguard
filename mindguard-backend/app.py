@@ -1,9 +1,10 @@
 from flask import Flask
 from flask_cors import CORS
-from flask_bcrypt import Bcrypt
 
 from config import Config
 from database.db import db
+from utils.extensions import bcrypt
+
 from models.user import User
 from models.planner import PlannerTask
 from models.interview import InterviewSession
@@ -21,28 +22,30 @@ from routes.interview import interview_bp
 from routes.assessment import assessment_bp
 
 app = Flask(__name__)
-bcrypt = Bcrypt(app)
 app.config.from_object(Config)
 
 CORS(app)
 
 db.init_app(app)
+bcrypt.init_app(app)
 
-app.register_blueprint(auth_bp)
-app.register_blueprint(report_bp)
-app.register_blueprint(dashboard_bp)
-app.register_blueprint(planner_bp)
-app.register_blueprint(progress_bp)
-app.register_blueprint(settings_bp)
-app.register_blueprint(interview_bp)
-app.register_blueprint(assessment_bp)
+app.register_blueprint(auth_bp, url_prefix="/api")
+app.register_blueprint(report_bp, url_prefix="/api")
+app.register_blueprint(dashboard_bp, url_prefix="/api")
+app.register_blueprint(planner_bp, url_prefix="/api")
+app.register_blueprint(progress_bp, url_prefix="/api")
+app.register_blueprint(settings_bp, url_prefix="/api")
+app.register_blueprint(interview_bp, url_prefix="/api")
+app.register_blueprint(assessment_bp, url_prefix="/api")
+
 
 @app.route("/")
 def home():
     return {
-        "status":"running",
-        "project":"MindGuard AI"
+        "status": "running",
+        "project": "MindGuard AI"
     }
+
 
 with app.app_context():
     db.create_all()

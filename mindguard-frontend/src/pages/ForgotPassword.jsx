@@ -4,13 +4,26 @@ import { Mail, ArrowRight, CheckCircle2 } from 'lucide-react'
 import AuthShell from '../components/layout/AuthShell.jsx'
 import TextField from '../components/ui/TextField.jsx'
 import Button from '../components/ui/Button.jsx'
+import { auth } from '../services/api'
 
 export default function ForgotPassword() {
   const [sent, setSent] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
-    setSent(true)
+    setError('')
+    setLoading(true)
+
+    try {
+      await auth.forgotPassword(e.target.email.value)
+      setSent(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -33,14 +46,17 @@ export default function ForgotPassword() {
           </div>
           <p className="text-sm text-text-hi mb-1.5">Check your inbox</p>
           <p className="text-sm text-text-lo">
-            If an account exists for that email, a reset link is on its way. The link expires shortly, so use it soon.
+            If an account exists for that email, a reset link is on its way.
           </p>
         </div>
       ) : (
         <form className="space-y-5" onSubmit={handleSubmit}>
-          <TextField label="Email" type="email" placeholder="you@school.edu" icon={Mail} required />
-          <Button type="submit" variant="primary" icon={ArrowRight} className="w-full">
-            Send Reset Link
+          {error && (
+            <p className="text-sm text-rose-300 bg-rose-300/10 rounded-lg px-4 py-2">{error}</p>
+          )}
+          <TextField label="Email" type="email" name="email" placeholder="you@school.edu" icon={Mail} required />
+          <Button type="submit" variant="primary" icon={ArrowRight} className="w-full" disabled={loading}>
+            {loading ? 'Sending...' : 'Send Reset Link'}
           </Button>
         </form>
       )}

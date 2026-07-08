@@ -223,11 +223,11 @@ class BurnoutEngine:
 
 
             "primary_contributors":
-                contributors,
+                recovery_focus.get("primary_contributors", []),
 
 
             "recovery_focus_areas":
-                recovery_focus,
+                recovery_focus.get("recovery_focus_areas", []),
 
 
             "category_summaries":

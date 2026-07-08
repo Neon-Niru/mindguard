@@ -8,6 +8,7 @@ import {
   Settings as SettingsIcon,
   LogOut,
 } from 'lucide-react'
+import { useAuth } from '../../context/AuthContext.jsx'
 
 const items = [
   { to: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -19,6 +20,17 @@ const items = [
 
 export default function AppSidebar() {
   const navigate = useNavigate()
+  const { user, logout } = useAuth()
+
+  function handleLogout() {
+    logout()
+    navigate('/login')
+  }
+
+  const initials = user?.full_name
+    ? user.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+    : 'U'
+
   return (
     <aside className="hidden md:flex flex-col w-64 shrink-0 h-screen sticky top-0 p-5">
       <div className="glass rounded-2xl flex flex-col h-full p-4">
@@ -51,15 +63,14 @@ export default function AppSidebar() {
         <div className="border-t border-white/10 pt-4 mt-4">
           <div className="flex items-center gap-3 px-2 mb-3">
             <div className="w-9 h-9 rounded-full bg-brand-gradient flex items-center justify-center text-sm font-semibold">
-              A
+              {initials}
             </div>
             <div className="min-w-0">
-              <p className="text-sm text-text-hi truncate">Aditi Sharma</p>
-              <p className="text-xs text-text-faint truncate">12th Grade</p>
+              <p className="text-sm text-text-hi truncate">{user?.full_name || 'Student'}</p>
             </div>
           </div>
           <button
-            onClick={() => navigate('/login')}
+            onClick={handleLogout}
             className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm text-text-lo hover:text-text-hi hover:bg-white/5 w-full transition-colors"
           >
             <LogOut size={17} />

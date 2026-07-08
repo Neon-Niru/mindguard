@@ -1,78 +1,146 @@
-from flask import Flask
-from flask_cors import CORS
-
-from config import Config
-
+from flask import Blueprint, jsonify, request
+from datetime import datetime
 from database.db import db
-
-from utils.extensions import bcrypt
-
-
-# Models
 from models.user import User
-from models.planner import PlannerTask
-from models.interview import InterviewSession
-from models.assessment import BurnoutAssessment
-from models.recovery_goal import RecoveryGoal
-from models.settings import UserSettings
+from utils.extensions import bcrypt
+from utils.auth import generate_token, jwt_required, decode_token
+
+auth_bp = Blueprint("auth", __name__)
 
 
-# Routes
-from routes.auth import auth_bp
-from routes.report import report_bp
-from routes.dashboard import dashboard_bp
-from routes.planner import planner_bp
-from routes.progress import progress_bp
-from routes.settings import settings_bp
-from routes.interview import interview_bp
-from routes.assessment import assessment_bp
+@auth_bp.route("/register", methods=["POST"])
+def register():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid request"}), 400
+
+    name = data.get("full_name", "").strip()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+
+    if not name or not email or not password:
+        return jsonify({"error": "full_name, email, and password are required"}), 400
+
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+
+    existing = User.query.filter_by(email=email).first()
+    if existing:
+        return jsonify({"error": "Email already registered"}), 409
+
+    password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
+    user = User(
+        full_name=name,
+        email=email,
+        password_hash=password_hash
+    )
+    db.session.add(user)
+    db.session.commit()
+
+    token = generate_token(user.user_id)
+
+    return jsonify({
+        "message": "Account created",
+        "token": token,
+        "user": {
+            "user_id": user.user_id,
+            "full_name": user.full_name,
+            "email": user.email
+        }
+    }), 201
 
 
+@auth_bp.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid request"}), 400
 
-app = Flask(__name__)
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
 
-app.config.from_object(Config)
+    if not email or not password:
+        return jsonify({"error": "Email and password are required"}), 400
 
+    user = User.query.filter_by(email=email).first()
+    if not user or not bcrypt.check_password_hash(user.password_hash, password):
+        return jsonify({"error": "Invalid email or password"}), 401
 
-CORS(app)
+    user.last_login = datetime.utcnow()
+    db.session.commit()
 
+    token = generate_token(user.user_id)
 
-db.init_app(app)
-
-bcrypt.init_app(app)
-
-
-
-app.register_blueprint(auth_bp)
-app.register_blueprint(report_bp)
-app.register_blueprint(dashboard_bp)
-app.register_blueprint(planner_bp)
-app.register_blueprint(progress_bp)
-app.register_blueprint(settings_bp)
-app.register_blueprint(interview_bp)
-app.register_blueprint(assessment_bp)
-
-
-
-@app.route("/")
-def home():
-
-    return {
-
-        "status": "running",
-
-        "project": "MindGuard AI"
-
-    }
+    return jsonify({
+        "message": "Login successful",
+        "token": token,
+        "user": {
+            "user_id": user.user_id,
+            "full_name": user.full_name,
+            "email": user.email
+        }
+    })
 
 
+@auth_bp.route("/me")
+@jwt_required
+def get_me():
+    user = User.query.get(request.current_user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({
+        "user_id": user.user_id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "account_created": str(user.account_created) if user.account_created else None
+    })
 
-with app.app_context():
 
-    db.create_all()
+@auth_bp.route("/forgot-password", methods=["POST"])
+def forgot_password():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid request"}), 400
+
+    email = data.get("email", "").strip().lower()
+    user = User.query.filter_by(email=email).first()
+
+    if user:
+        import secrets
+        from datetime import timedelta
+        token = secrets.token_urlsafe(32)
+        user.reset_token = token
+        user.reset_token_expires_at = datetime.utcnow() + timedelta(hours=1)
+        db.session.commit()
+
+    return jsonify({"message": "If an account exists for that email, a reset link has been sent."})
 
 
+@auth_bp.route("/reset-password", methods=["POST"])
+def reset_password():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid request"}), 400
 
-if __name__ == "__main__":
+    token = data.get("token", "")
+    new_password = data.get("password", "")
 
-    app.run(debug=True)
+    if not token or not new_password:
+        return jsonify({"error": "Token and password are required"}), 400
+
+    if len(new_password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+
+    user = User.query.filter_by(reset_token=token).first()
+    if not user:
+        return jsonify({"error": "Invalid or expired token"}), 400
+
+    if user.reset_token_expires_at and user.reset_token_expires_at < datetime.utcnow():
+        return jsonify({"error": "Token has expired"}), 400
+
+    user.password_hash = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    user.reset_token = None
+    user.reset_token_expires_at = None
+    db.session.commit()
+
+    return jsonify({"message": "Password has been reset successfully."})

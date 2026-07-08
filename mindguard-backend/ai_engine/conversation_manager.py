@@ -43,7 +43,7 @@ def process_message(message, state=None):
     )
 
 
-    reply = ask_llm(prompt)
+    reply = ask_llm(prompt, state)
 
 
 

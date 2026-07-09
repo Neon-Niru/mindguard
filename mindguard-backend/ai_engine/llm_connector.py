@@ -40,6 +40,18 @@ FALLBACK_QUESTIONS_MAP = {
 }
 
 
+def _build_hf_prompt(messages):
+    system_parts = []
+    user_message = ""
+    for msg in messages:
+        if msg["role"] == "system":
+            system_parts.append(msg["content"])
+        elif msg["role"] == "user":
+            user_message = msg["content"]
+    system_text = "\n\n".join(system_parts)
+    return f"<s>[INST] {system_text}\n\n{user_message} [/INST]"
+
+
 def ask_llm(messages, state=None):
     provider = os.getenv("LLM_PROVIDER", "groq").lower()
     api_key = os.getenv(f"{provider.upper()}_API_KEY")
@@ -53,13 +65,16 @@ def ask_llm(messages, state=None):
             return "Thank you for sharing. I think I have enough information now."
 
         model = os.getenv("HF_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
-        api_url = f"https://api-inference.huggingface.co/models/{model}/v1/chat/completions"
+        api_url = f"https://api-inference.huggingface.co/models/{model}"
 
+        prompt = _build_hf_prompt(messages)
         payload = {
-            "model": model,
-            "messages": messages,
-            "temperature": 0.8,
-            "max_tokens": 512,
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 512,
+                "temperature": 0.8,
+                "return_full_text": False,
+            },
         }
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -67,15 +82,15 @@ def ask_llm(messages, state=None):
         }
 
         try:
-            response = requests.post(api_url, json=payload, headers=headers, timeout=30)
+            response = requests.post(api_url, json=payload, headers=headers, timeout=60)
             response.raise_for_status()
         except requests.RequestException as error:
             raise Exception(f"LLM request failed: {error}")
 
         data = response.json()
         try:
-            return data["choices"][0]["message"]["content"]
-        except (KeyError, IndexError):
+            return data[0][0]["generated_text"]
+        except (KeyError, IndexError, TypeError):
             raise Exception("Invalid LLM response format")
 
     if not api_key:

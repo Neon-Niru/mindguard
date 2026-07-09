@@ -59,7 +59,7 @@ def ask_llm(messages, state=None):
     payload = {
         "model": model,
         "messages": messages,
-        "temperature": 0.3,
+        "temperature": 0.8,
     }
 
     headers = {

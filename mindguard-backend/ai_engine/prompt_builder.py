@@ -213,11 +213,6 @@ Previous conversation:
 
 {history}
 
-Instructions:
-- Ask only one question.
-- Ask for missing information.
-- Do not score anything.
-- Do not summarize burnout.
 """
         },
 

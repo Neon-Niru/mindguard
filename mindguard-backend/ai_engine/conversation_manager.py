@@ -68,7 +68,7 @@ def process_message(message, state=None):
 
         item["content"]
 
-        for item in state["history"]
+        for item in state["history"] if item["role"] == "student"
 
     )
 

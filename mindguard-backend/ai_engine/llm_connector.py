@@ -44,6 +44,40 @@ def ask_llm(messages, state=None):
     provider = os.getenv("LLM_PROVIDER", "groq").lower()
     api_key = os.getenv(f"{provider.upper()}_API_KEY")
 
+    # Hugging Face Inference API
+    if provider in ("hf", "huggingface"):
+        if not api_key:
+            if state and state.get("missing"):
+                cat = state["missing"][0]
+                return FALLBACK_QUESTIONS_MAP.get(cat, "Tell me more about how you've been feeling.")
+            return "Thank you for sharing. I think I have enough information now."
+
+        model = os.getenv("HF_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
+        api_url = f"https://api-inference.huggingface.co/models/{model}/v1/chat/completions"
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.8,
+            "max_tokens": 512,
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            response = requests.post(api_url, json=payload, headers=headers, timeout=30)
+            response.raise_for_status()
+        except requests.RequestException as error:
+            raise Exception(f"LLM request failed: {error}")
+
+        data = response.json()
+        try:
+            return data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError):
+            raise Exception("Invalid LLM response format")
+
     if not api_key:
         if state and state.get("missing"):
             cat = state["missing"][0]

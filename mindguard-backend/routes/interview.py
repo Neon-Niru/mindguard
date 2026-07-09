@@ -8,6 +8,7 @@ from models.planner import PlannerTask
 from engine.burnout_engine import BurnoutEngine
 from engine.schema import ENGINE_SCHEMA
 from ai_engine.conversation_manager import process_message
+from ai_engine.llm_connector import FALLBACK_QUESTIONS_MAP
 from ai_engine.state_manager import create_state, is_complete, REQUIRED_INTERVIEW_CATEGORIES
 from utils.auth import jwt_required
 
@@ -93,25 +94,7 @@ def interview():
         if not reply:
             missing = state.get("missing", [])
             if missing:
-                questions = {
-                    "sleep": "How has your sleep been this week?",
-                    "academic_load": "How are your studies going?",
-                    "emotional_exhaustion": "Have you been feeling emotionally drained?",
-                    "motivation": "How is your motivation for studying these days?",
-                    "cognitive": "How is your concentration and memory?",
-                    "stress": "How would you rate your stress level?",
-                    "anxiety": "Do you find yourself worrying often?",
-                    "mood": "How has your mood been lately?",
-                    "productivity": "How productive have you been feeling?",
-                    "time_management": "How well are you managing your time?",
-                    "social_support": "Do you have people you can talk to?",
-                    "lifestyle": "How is your daily routine?",
-                    "digital_behaviour": "How is your screen time?",
-                    "burnout_symptoms": "Have you been feeling overwhelmed?",
-                    "recent_life_events": "Have there been any major changes recently?",
-                    "exercise": "Are you getting any physical activity?",
-                }
-                reply = questions.get(missing[0], "Tell me more about how you've been feeling.")
+                reply = FALLBACK_QUESTIONS_MAP.get(missing[0], "Tell me more about how you've been feeling.")
             else:
                 reply = "I think I have enough information now."
 

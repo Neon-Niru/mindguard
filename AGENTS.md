@@ -70,7 +70,7 @@ D:\mindguard\
 ## Key Architecture Decisions
 1. **JWT Auth**: Bearer tokens stored in localStorage, `jwt_required` decorator on protected routes
 2. **Database**: SQLite (dev), all URLs prefixed with `/api`
-3. **Interview**: Multi-turn conversation with Groq LLM, limited to 6 rounds (force-complete), states stored in DB per-turn
+3. **Interview**: Multi-turn conversation with Groq LLM, limited to 20 rounds (force-complete), states stored in DB per-turn
 4. **Extraction**: Regex + keyword-based from full conversation history
 5. **Scoring**: Ordinal→numeric mapping (Never=0, Rarely=25, Sometimes=50, Often=75, Always=100), continuous fields use raw values normalized to 0-100
 
@@ -112,9 +112,9 @@ SECRET_KEY=your-secret-key-here
 
 ## Interview Flow
 1. POST `/api/interview` with `{message: "..."}` → returns `session_id`, `reply`, `complete: false`
-2. Continue with `{message: "...", session_id: "..."}` for up to 6 rounds
+2. Continue with `{message: "...", session_id: "..."}` for up to 20 rounds
 3. When `complete: true`, returns burnout report with scores
-4. MAX_INTERVIEW_ROUNDS = 6 (in routes/interview.py)
+4. MAX_INTERVIEW_ROUNDS = 20 (in routes/interview.py)
 
 ## API Endpoints
 | Method | Path | Auth | Description |

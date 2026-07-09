@@ -55,7 +55,7 @@ def ask_llm(messages, state=None):
         model = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct")
     else:
         api_url = os.getenv("GROQ_URL", DEFAULT_GROQ_URL)
-        model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 
     payload = {
         "model": model,

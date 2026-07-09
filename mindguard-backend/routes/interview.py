@@ -11,7 +11,7 @@ from ai_engine.conversation_manager import process_message
 from ai_engine.state_manager import create_state, is_complete, REQUIRED_INTERVIEW_CATEGORIES
 from utils.auth import jwt_required
 
-MAX_INTERVIEW_ROUNDS = 6
+MAX_INTERVIEW_ROUNDS = 20
 interview_bp = Blueprint("interview", __name__)
 
 

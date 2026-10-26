@@ -11,6 +11,11 @@ on:
 permissions:
   contents: write
 
+# Only one deployment at a time; a newer push supersedes a queued run.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
 jobs:
   backend-tests:
     runs-on: ubuntu-latest

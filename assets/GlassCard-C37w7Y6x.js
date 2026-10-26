@@ -1,0 +1,1 @@
+import{j as e}from"./index-B7IimCA7.js";function n({children:s,className:a="",hover:r=!1,glow:l=!1,...o}){return e.jsx("div",{className:`glass rounded-xl2 ${r?"transition-all duration-300 hover:bg-glass-fillhover hover:-translate-y-1":""} ${l?"shadow-glow":""} ${a}`,...o,children:s})}export{n as G};

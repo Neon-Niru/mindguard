@@ -140,85 +140,70 @@ Wait for their answer.
 Then: "Thanks for being real with me. That information is going to help me give you an accurate picture of how you're doing."
 
 =====================================
-STRUCTURED OUTPUT (when interview is complete)
+STRUCTURED OUTPUT
 =====================================
 
-Convert the conversation to structured JSON only after 15+ exchanges:
+The backend extracts structured facts from the student's own messages.
+You must NEVER return JSON or a data structure.
+Always reply with natural language: one short empathic sentence and at most
+one focused follow-up question.
 
-{
-  "academic_load": {
-    "raw_data": "what they said",
-    "clarity": "clear/unclear/contradictory"
-  },
-  "sleep": {
-    "raw_data": "what they said",
-    "clarity": "clear/unclear/contradictory"
-  },
-  ... (all required topics)
-  "noted_contradictions": [
-    "Student said X at minute 5, then said Y at minute 20. Asked for clarification."
-  ],
-  "missing_information": [
-    "Didn't ask about digital habits"
-  ],
-  "interviewer_notes": "General observations about the conversation quality"
+"""
+
+
+TONE_INSTRUCTIONS = {
+    "supportive": (
+        "Tone: warm, validating and gentle. Normalise their experience before "
+        "asking the next question."
+    ),
+    "direct": (
+        "Tone: concise and practical. Acknowledge briefly, then ask a clear, "
+        "specific question without extra small talk."
+    ),
+    "reflective": (
+        "Tone: reflective. Mirror their own words back to them and invite them "
+        "to explore what they mean before moving on."
+    ),
 }
 
-ONLY include what they actually said.
-Mark unknowns as null.
-Flag contradictions - don't resolve them for them.
 
-=====================================
-WHAT YOU ARE NOT
-=====================================
+def build_prompt(history, state, user_message, tone="supportive"):
 
-You are NOT a therapist
-You are NOT a doctor
-You are NOT calculating burnout
-You are NOT making decisions
-You are NOT diagnosing conditions
-You are NOT recommending treatment
+    import json
 
-You ARE a listener
-You ARE a fact-collector
-You ARE empathetic
-You ARE patient
-You ARE honest about your limits
+    context = {
+        "known_information": state.get("data", {}),
+        "topics_still_missing": state.get("missing", []),
+    }
 
-Your job ends when you send structured data to the Burnout Engine.
-The Engine does all the analysis.
-You just collect what they tell you.
+    tone_instruction = TONE_INSTRUCTIONS.get(
+        tone, TONE_INSTRUCTIONS["supportive"]
+    )
 
-"""
-
-
-def build_prompt(history, state, user_message):
-
-    return [
-
+    messages = [
         {
-            "role":"system",
-            "content":SYSTEM_PROMPT
+            "role": "system",
+            "content": SYSTEM_PROMPT
         },
-
         {
-            "role":"system",
-            "content":
-            f"""
-Current interview state:
-
-{state}
-
-Previous conversation:
-
-{history}
-
-"""
+            "role": "system",
+            "content": (
+                "Backend context (do not read this aloud):\n"
+                f"{json.dumps(context, default=str)}\n\n"
+                f"{tone_instruction}"
+            )
         },
-
-        {
-            "role":"user",
-            "content":user_message
-        }
-
     ]
+
+    for item in history:
+        content = (item.get("content") or "").strip()
+        if not content:
+            continue
+
+        role = "user" if item.get("role") == "student" else "assistant"
+        messages.append({"role": role, "content": content})
+
+    if not messages or messages[-1]["role"] != "user" or messages[-1]["content"] != user_message:
+        messages.append({"role": "user", "content": user_message})
+
+    return messages

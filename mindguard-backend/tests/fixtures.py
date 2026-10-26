@@ -1,0 +1,81 @@
+"""Shared fixtures for the MindGuard backend test suite."""
+
+GOOD_PAYLOAD = {
+    "sleep": {
+        "hours": 8,
+        "quality": "Good",
+        "rested": "Often",
+        "consistency": "Regular",
+    },
+    "academic_load": {
+        "study_hours": 2,
+        "homework_load": "Light",
+        "assignments": "A few",
+        "projects": "A few",
+        "upcoming_exams": "Low",
+        "subject_difficulty": "Low",
+        "academic_expectations": "Low",
+        "attendance": 98,
+    },
+    "emotional_exhaustion": {
+        "feeling_drained": "Rarely",
+        "recovery_after_rest": "Often",
+    },
+    "burnout_symptoms": {
+        "overwhelmed": "Rarely",
+        "loss_of_interest": "Rarely",
+    },
+    "motivation": {"study_motivation": "Good"},
+    "cognitive": {"concentration": "Good", "memory": "Good"},
+    "stress": {"stress_frequency": "Low", "stress_control": "Good"},
+    "anxiety": {"worry_frequency": "Rarely"},
+    "mood": {"positive_mood": "Good"},
+    "productivity": {"task_completion": "Good"},
+    "time_management": {"planning": "Good"},
+    "recent_life_events": {"major_changes": "None"},
+    "personality_traits": {"perfectionism_pressure": "Low"},
+    "digital_behaviour": {"screen_time_control": "Good"},
+    "lifestyle": {"daily_routine": "Good"},
+    "social_support": {"support_availability": "Available"},
+    "exercise": {"physical_activity": "Regular"},
+}
+
+BAD_PAYLOAD = {
+    "sleep": {
+        "hours": 3,
+        "quality": "Poor",
+        "rested": "Never",
+        "consistency": "Irregular",
+    },
+    "academic_load": {
+        "study_hours": 16,
+        "homework_load": "Heavy",
+        "assignments": "Several",
+        "projects": "Several",
+        "upcoming_exams": "High",
+        "subject_difficulty": "High",
+        "academic_expectations": "High",
+        "attendance": 40,
+    },
+    "emotional_exhaustion": {
+        "feeling_drained": "Always",
+        "recovery_after_rest": "Never",
+    },
+    "burnout_symptoms": {
+        "overwhelmed": "Always",
+        "loss_of_interest": "Always",
+    },
+    "motivation": {"study_motivation": "Low"},
+    "cognitive": {"concentration": "Poor", "memory": "Poor"},
+    "stress": {"stress_frequency": "High", "stress_control": "Low"},
+    "anxiety": {"worry_frequency": "Always"},
+    "mood": {"positive_mood": "Poor"},
+    "productivity": {"task_completion": "Poor"},
+    "time_management": {"planning": "Poor"},
+    "recent_life_events": {"major_changes": "Major"},
+    "personality_traits": {"perfectionism_pressure": "High"},
+    "digital_behaviour": {"screen_time_control": "Poor"},
+    "lifestyle": {"daily_routine": "Poor"},
+    "social_support": {"support_availability": "Low"},
+    "exercise": {"physical_activity": "Never"},
+}

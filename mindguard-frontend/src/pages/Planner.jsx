@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Clock, Tag, Sparkles, User as UserIcon, Trash2 } from 'lucide-react'
+import { Plus, Clock, Tag, Sparkles, User as UserIcon, Trash2, AlertCircle } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader.jsx'
 import GlassCard from '../components/ui/GlassCard.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
@@ -10,38 +10,104 @@ import { planner as plannerApi } from '../services/api'
 
 const priorityTone = { High: 'high', Medium: 'moderate', Low: 'low' }
 
+const EMPTY_FORM = {
+  title: '',
+  description: '',
+  category: 'General',
+  priority: 'Medium',
+  due_date: '',
+  due_time: '',
+}
+
 export default function Planner() {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ title: '', description: '', category: 'General', priority: 'Medium', due_date: '', due_time: '' })
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
+
     plannerApi.list()
-      .then(setTasks)
-      .catch(() => setTasks([]))
-      .finally(() => setLoading(false))
+      .then((data) => {
+        if (!cancelled) setTasks(Array.isArray(data) ? data : [])
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   async function toggleTask(task) {
-    await plannerApi.update(task.task_id, { completed: !task.completed })
-    setTasks((prev) => prev.map((t) =>
-      t.task_id === task.task_id ? { ...t, completed: !t.completed } : t
-    ))
+    setError('')
+    const nextCompleted = !task.completed
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.task_id === task.task_id ? { ...t, completed: nextCompleted } : t
+      )
+    )
+
+    try {
+      const res = await plannerApi.update(task.task_id, { completed: nextCompleted })
+      // Trust the server response (it also sets the completion date).
+      if (res.task) {
+        setTasks((prev) =>
+          prev.map((t) => (t.task_id === task.task_id ? res.task : t))
+        )
+      }
+    } catch (err) {
+      // Roll back the optimistic update so the UI matches the database.
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.task_id === task.task_id ? { ...t, completed: task.completed } : t
+        )
+      )
+      setError(err.message)
+    }
   }
 
   async function deleteTask(taskId) {
-    await plannerApi.remove(taskId)
+    setError('')
+    const snapshot = tasks
+
     setTasks((prev) => prev.filter((t) => t.task_id !== taskId))
+
+    try {
+      await plannerApi.remove(taskId)
+    } catch (err) {
+      setTasks(snapshot)
+      setError(err.message)
+    }
   }
 
   async function addTask(e) {
     e.preventDefault()
-    if (!form.title.trim()) return
-    const res = await plannerApi.add({ ...form, task_source: 'USER' })
-    setTasks((prev) => [{ ...form, task_id: res.task_id, completed: false, task_source: 'USER' }, ...prev])
-    setForm({ title: '', description: '', category: 'General', priority: 'Medium', due_date: '', due_time: '' })
-    setShowForm(false)
+    if (!form.title.trim() || saving) return
+
+    setError('')
+    setSaving(true)
+
+    try {
+      const res = await plannerApi.add({ ...form, task_source: 'USER' })
+      if (res.task) {
+        setTasks((prev) => [res.task, ...prev])
+      }
+      setForm(EMPTY_FORM)
+      setShowForm(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const completed = tasks.filter((t) => t.completed).length
@@ -59,14 +125,21 @@ export default function Planner() {
     <div>
       <PageHeader
         eyebrow="Recovery Planner"
-        title="Today's Plan"
+        title="Your Plan"
         description="Your tasks and recovery goals, together in one place."
       />
+
+      {error && (
+        <p className="flex items-center gap-2 text-sm text-rose-300 bg-rose-300/10 rounded-xl px-4 py-2.5 mb-5">
+          <AlertCircle size={15} />
+          {error}
+        </p>
+      )}
 
       <GlassCard glow className="p-7 mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-xs text-text-lo mb-1">Daily Progress</p>
+            <p className="text-xs text-text-lo mb-1">Overall Progress</p>
             <p className="text-3xl font-display font-semibold">{percent}%</p>
           </div>
           <p className="text-sm text-text-lo">{completed} of {tasks.length} tasks completed</p>
@@ -90,6 +163,7 @@ export default function Planner() {
                   placeholder="What do you need to do?"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  maxLength={200}
                   required
                 />
               </div>
@@ -99,6 +173,7 @@ export default function Planner() {
                   placeholder="Optional details..."
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  maxLength={500}
                 />
               </div>
               <label className="block">
@@ -144,8 +219,12 @@ export default function Planner() {
               />
             </div>
             <div className="flex justify-end gap-3">
-              <Button variant="ghost" type="button" onClick={() => setShowForm(false)}>Cancel</Button>
-              <Button variant="primary" type="submit">Add Task</Button>
+              <Button variant="ghost" type="button" onClick={() => setShowForm(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" type="submit" disabled={saving}>
+                {saving ? 'Adding...' : 'Add Task'}
+              </Button>
             </div>
           </form>
         </GlassCard>
@@ -165,7 +244,8 @@ export default function Planner() {
               className={`w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
                 task.completed ? 'bg-brand-gradient border-transparent' : 'border-white/20 hover:border-accent-purple/50'
               }`}
-              aria-label="Toggle task completion"
+              aria-label={task.completed ? 'Mark task as not done' : 'Mark task as done'}
+              aria-pressed={task.completed}
             >
               {task.completed && <span className="w-2 h-2 rounded-full bg-white" />}
             </button>
@@ -174,6 +254,9 @@ export default function Planner() {
               <p className={`text-sm font-medium mb-1.5 ${task.completed ? 'text-text-faint line-through' : 'text-text-hi'}`}>
                 {task.title}
               </p>
+              {task.description && (
+                <p className="text-xs text-text-lo mb-1.5">{task.description}</p>
+              )}
               <div className="flex flex-wrap items-center gap-3 text-xs text-text-lo">
                 <span className="flex items-center gap-1.5">
                   <Tag size={12} /> {task.category || 'General'}

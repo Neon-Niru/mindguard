@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Plus, Brain, User, FileText, Moon, Gauge, Heart, ListChecks } from 'lucide-react'
+import { Send, Plus, Brain, User, FileText, Moon, Gauge, Heart, ListChecks, AlertCircle } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader.jsx'
 import GlassCard from '../components/ui/GlassCard.jsx'
 import Button from '../components/ui/Button.jsx'
 import { interview } from '../services/api'
+
+const WELCOME = "Hi there! I'm your wellness companion. How has your week been feeling?"
 
 function Bubble({ role, text }) {
   const isAI = role === 'ai'
@@ -21,6 +23,11 @@ function Bubble({ role, text }) {
 
 function ReportCard({ report }) {
   if (!report) return null
+
+  const completeness = typeof report.data_completeness === 'number'
+    ? Math.round(report.data_completeness * 100)
+    : null
+
   return (
     <div className="glass rounded-2xl p-5 md:p-6 border-accent-purple/20 animate-fadeUp">
       <div className="flex items-center gap-2.5 mb-5">
@@ -29,7 +36,15 @@ function ReportCard({ report }) {
         </span>
         <div>
           <p className="text-sm font-medium">Wellness Report</p>
-          <p className="text-xs text-text-faint">Generated from this conversation</p>
+          <p className="text-xs text-text-faint">
+            Generated from this conversation
+            {typeof report.categories_assessed === 'number' && (
+              <> · {report.categories_assessed} categories assessed</>
+            )}
+            {completeness !== null && (
+              <> · {completeness}% of the picture covered</>
+            )}
+          </p>
         </div>
       </div>
 
@@ -50,6 +65,13 @@ function ReportCard({ report }) {
           <p className="text-lg font-display font-semibold text-accent-blue">{report.risk_level}</p>
         </div>
       </div>
+
+      {completeness !== null && completeness < 100 && (
+        <p className="text-xs text-text-faint mb-5">
+          This report is based on the topics you shared. A future check-in can fill
+          in the rest for a fuller picture.
+        </p>
+      )}
 
       {report.primary_contributors && report.primary_contributors.length > 0 && (
         <div className="rounded-xl bg-white/5 p-4 mb-5">
@@ -83,59 +105,68 @@ function ReportCard({ report }) {
 
 export default function AIChat() {
   const [input, setInput] = useState('')
-  const [messages, setMessages] = useState([
-    { id: 'welcome', role: 'ai', text: "Hi there! I'm your wellness companion. How has your week been feeling?" }
-  ])
+  const [messages, setMessages] = useState([{ id: 'welcome', role: 'ai', text: WELCOME }])
   const [sessionId, setSessionId] = useState(null)
   const [report, setReport] = useState(null)
   const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
   const bottomRef = useRef(null)
+  const nextId = useRef(1)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, report])
 
+  function pushMessage(role, text) {
+    nextId.current += 1
+    setMessages((prev) => [...prev, { id: `m${nextId.current}`, role, text }])
+  }
+
   async function handleSend(e) {
     e.preventDefault()
-    if (!input.trim() || sending) return
-
     const userText = input.trim()
+    if (!userText || sending || report) return
+
+    setError('')
     setInput('')
-    setMessages((prev) => [...prev, { id: Date.now().toString(), role: 'user', text: userText }])
+    pushMessage('user', userText)
     setSending(true)
 
     try {
       const data = await interview.send(userText, sessionId)
-      setSessionId(data.session_id)
+      if (data.session_id) setSessionId(data.session_id)
 
-      if (data.complete) {
+      if (data.complete && data.report) {
         setReport(data.report)
-        setMessages((prev) => [
-          ...prev,
-          { id: (Date.now() + 1).toString(), role: 'ai', text: "I've gathered enough information. Here's your wellness report:" }
-        ])
+        pushMessage('ai', "I've gathered enough information. Here's your wellness report:")
       } else {
-        setMessages((prev) => [
-          ...prev,
-          { id: (Date.now() + 1).toString(), role: 'ai', text: data.reply || "Tell me more about how you've been feeling." }
-        ])
+        pushMessage('ai', data.reply || "Tell me more about how you've been feeling.")
       }
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { id: (Date.now() + 1).toString(), role: 'ai', text: "Sorry, I'm having trouble connecting right now. Please try again." }
-      ])
+    } catch (err) {
+      // 422 means the engine had nothing reliable to score. Keep the session
+      // usable so the student can add more detail.
+      if (err.status === 422) {
+        setError(err.message)
+      } else if (err.status === 409) {
+        setError(err.message)
+      } else {
+        setError(err.message || 'Something went wrong. Please try again.')
+      }
+
+      pushMessage(
+        'ai',
+        err.message || "Sorry, I'm having trouble connecting right now. Please try again."
+      )
     } finally {
       setSending(false)
     }
   }
 
   function resetChat() {
-    setMessages([
-      { id: 'welcome', role: 'ai', text: "Hi there! I'm your wellness companion. How has your week been feeling?" }
-    ])
+    setMessages([{ id: 'welcome', role: 'ai', text: WELCOME }])
     setSessionId(null)
     setReport(null)
+    setError('')
   }
 
   return (
@@ -160,12 +191,26 @@ export default function AIChat() {
           <div ref={bottomRef} />
         </div>
 
+        {error && !report && (
+          <p className="flex items-center gap-2 text-xs text-rose-300 bg-rose-300/10 rounded-lg px-3 py-2 mt-4">
+            <AlertCircle size={14} />
+            {error}
+          </p>
+        )}
+
         <form onSubmit={handleSend} className="flex items-center gap-3 mt-5 pt-5 border-t border-white/10">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={sending ? 'Waiting for response...' : 'Type your message...'}
+            placeholder={
+              report
+                ? 'Check-in complete — start a new conversation'
+                : sending
+                  ? 'Waiting for response...'
+                  : 'Type your message...'
+            }
             disabled={sending || !!report}
+            maxLength={4000}
             className="flex-1 bg-white/5 border border-white/10 rounded-full px-5 py-3 text-sm outline-none focus:border-accent-purple/50 focus:bg-white/[0.07] transition-colors disabled:opacity-50"
           />
           <button

@@ -53,11 +53,7 @@ export default function Login() {
         <TextField label="Email" type="email" name="email" placeholder="you@school.edu" icon={Mail} required />
         <TextField label="Password" type="password" name="password" placeholder="••••••••" icon={Lock} required />
 
-        <div className="flex items-center justify-between text-xs">
-          <label className="flex items-center gap-2 text-text-lo">
-            <input type="checkbox" className="rounded border-white/20 bg-white/5" />
-            Remember me
-          </label>
+        <div className="flex items-center justify-end text-xs">
           <Link to="/forgot-password" className="text-accent-purple hover:text-accent-teal transition-colors">
             Forgot password?
           </Link>

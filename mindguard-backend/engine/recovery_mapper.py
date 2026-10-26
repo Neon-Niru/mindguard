@@ -231,38 +231,48 @@ def map_recovery_focus(contributors):
     )
 
 
-    primary_contributors = []
+    primary_categories = [
+        category for category, contribution in ranked
+        if contribution > 0
+    ][:3]
 
+    primary_contributors = [
+        category.replace("_", " ").title()
+        for category in primary_categories
+    ]
+
+    # Prefer one suggestion from each of the top contributors so the plan
+    # is not dominated by a single category.
     recovery_focus = []
+    suggestion_index = 0
 
+    while len(recovery_focus) < 3:
 
-    for category, contribution in ranked:
+        added = False
 
+        for category in primary_categories:
 
-        if contribution <= 0:
+            suggestions = RECOVERY_MAPPING.get(category, [])
 
-            continue
+            if suggestion_index < len(suggestions):
 
+                suggestion = suggestions[suggestion_index]
 
-        primary_contributors.append(
+                if suggestion not in recovery_focus:
 
-            category.replace("_", " ").title()
+                    recovery_focus.append(suggestion)
 
-        )
+                added = True
 
+            if len(recovery_focus) >= 3:
 
-        if category in RECOVERY_MAPPING:
+                break
 
-            recovery_focus.extend(
-
-                RECOVERY_MAPPING[category]
-
-            )
-
-
-        if len(primary_contributors) >= 3:
+        if not added:
 
             break
+
+        suggestion_index += 1
 
 
 

@@ -1,28 +1,59 @@
-name: Deploy Frontend
+name: Test and Deploy
 
 on:
   push:
     branches:
       - main
       - backup-f71dc85
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  backend-tests:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-python@v5
         with:
-          node-version: 18
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: mindguard-backend/requirements.txt
 
-      - run: |
-          cd mindguard-frontend
-          npm install
+      - name: Install backend dependencies
+        working-directory: mindguard-backend
+        run: pip install -r requirements.txt
+
+      - name: Run backend tests
+        working-directory: mindguard-backend
+        run: python -m unittest discover -s tests -t . -v
+
+  deploy-frontend:
+    needs: backend-tests
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mindguard-frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: mindguard-frontend
+        run: |
+          npm ci
           npm run build
 
-      - uses: peaceiris/actions-gh-pages@v3
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./mindguard-frontend/dist

@@ -48,6 +48,12 @@ h1, h2, h3, h4 {
   color: transparent;
 }
 
+/* Keep anchored sections clear of the fixed landing navbar. */
+section[id],
+footer[id] {
+  scroll-margin-top: 6.5rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

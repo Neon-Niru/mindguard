@@ -13,7 +13,7 @@ No scoring logic.
 """
 
 
-ENGINE_VERSION = "1.0.0"
+ENGINE_VERSION = "1.1.0"
 
 
 
@@ -71,6 +71,7 @@ PROTECTIVE_FACTOR_WEIGHTS = {
 
 
 # Configurable risk classification
+# Boundaries are inclusive. Classification uses the lower bound of each band.
 
 RISK_THRESHOLDS = {
 

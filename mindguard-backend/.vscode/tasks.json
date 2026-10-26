@@ -2,18 +2,26 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Verify engine behavior",
+			"label": "Run backend tests",
 			"type": "shell",
-			"command": "python verify_engine.py",
+			"command": "python -m unittest discover -s tests -t . -v",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
 			"problemMatcher": [],
-			"group": "test"
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
 		},
 		{
-			"label": "verify-engine-behavior",
+			"label": "Run API",
 			"type": "shell",
-			"command": "python verify_engine.py",
-			"problemMatcher": [],
-			"group": "test"
+			"command": "python -m flask --app app.py run --port=5000",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": []
 		}
 	]
 }

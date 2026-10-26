@@ -16,7 +16,8 @@ class UserSettings(db.Model):
     user_id = db.Column(
         db.Integer,
         db.ForeignKey("users.user_id"),
-        nullable=False
+        nullable=False,
+        unique=True
     )
 
 
@@ -29,6 +30,30 @@ class UserSettings(db.Model):
     notification_preference = db.Column(
         db.Boolean,
         default=True
+    )
+
+
+    notification_checkins = db.Column(
+        db.Boolean,
+        default=True
+    )
+
+
+    notification_planner = db.Column(
+        db.Boolean,
+        default=True
+    )
+
+
+    notification_weekly = db.Column(
+        db.Boolean,
+        default=False
+    )
+
+
+    ai_tone = db.Column(
+        db.String(30),
+        default="supportive"
     )
 
 

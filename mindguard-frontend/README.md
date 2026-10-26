@@ -1,47 +1,83 @@
 # MindGuard AI — Frontend
 
-This is **only the frontend (UI/UX layer)** of MindGuard AI, built to match `plan.md`'s
-Level 1 — User Interface spec. It contains no backend, no AI logic, and no database code —
-all data on these pages is static mock data in `src/data/mockData.js`, ready to be swapped
-for real API calls later.
+The React client for MindGuard AI. It handles the landing page, authentication,
+the AI check-in, the recovery planner, progress charts, and account settings.
+All persistence and scoring live in the Flask backend — this app only renders
+data returned by the API.
 
 ## Stack
-- React 18 + Vite
-- React Router v6 (client-side routing)
+
+- React 18 + Vite 5
+- React Router v6 (client-side routing, base-path aware)
 - Tailwind CSS (design tokens in `tailwind.config.js`)
-- Recharts (Progress page trend charts)
+- Recharts (progress charts)
 - lucide-react (icons)
 
 ## Getting started
+
 ```bash
 npm install
 npm run dev
 ```
-Then open the local URL Vite prints (usually http://localhost:5173).
 
-## Pages
+Vite serves `http://localhost:5173` and proxies `/api` to
+`http://localhost:5000`, so start the backend first.
+
+## Environment
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `VITE_API_URL` | `.env.local` / `.env.production` | API base URL including `/api` |
+| `VITE_BASE_PATH` | build env | Overrides the deployed base path |
+
+Defaults:
+- Dev base: `/` (with the `/api` proxy)
+- Build base: `/mindguard/` (GitHub Pages); override with `VITE_BASE_PATH`
+- Without `VITE_API_URL`, the client calls `/api` on the same origin
+
+Production uses `.env.production`:
+
+```ini
+VITE_API_URL=https://mindguard-demo-ln8z.onrender.com/api
+```
+
+## Scripts
+
+```bash
+npm run dev       # Vite dev server
+npm run build     # Production build to dist/
+npm run preview   # Preview the production build
+```
+
+## Routes
+
 | Route | Page |
 |---|---|
 | `/` | Landing (Hero, Features, How It Works, About, Contact footer) |
 | `/login` | Login |
 | `/register` | Register |
-| `/forgot-password` | Forgot Password |
-| `/app/dashboard` | Dashboard (latest snapshot only, no history) |
-| `/app/chat` | AI Wellness Chat + inline report |
-| `/app/planner` | Recovery Planner (tasks + goals + progress bar) |
-| `/app/progress` | Progress (historical trends via Recharts) |
-| `/app/settings` | Settings (Profile, Password, Notifications, Theme, AI Config, Privacy) |
+| `/forgot-password` | Request a reset link |
+| `/reset-password?token=...` | Choose a new password |
+| `/app/dashboard` | Latest wellness snapshot, today's planner progress, open goals |
+| `/app/chat` | AI check-in and inline wellness report |
+| `/app/planner` | Tasks and recovery goals |
+| `/app/progress` | Assessment trends, weekly planner completion, goal completion |
+| `/app/settings` | Profile, password, notifications, AI tone, privacy/export/delete |
+| `*` | Not found |
 
-## Design system
-- **Theme:** dark mode by default
-- **Accent:** blue → purple → teal gradient (`bg-brand-gradient` / `.text-gradient`)
-- **Style:** glassmorphism (`.glass` utility class — frosted, blurred, soft border), large
-  rounded corners, soft glows, floating decorative icons, subtle motion
-- Colors, fonts, and radii are defined once in `tailwind.config.js` / `src/index.css` and
-  reused everywhere — every page pulls from the same tokens.
+## Implementation notes
 
-## Wiring up the real backend later
-Replace the imports from `src/data/mockData.js` with real API calls (fetch/axios) inside
-each page, matching the JSON shapes documented in `plan.md`'s backend module contracts.
-Auth forms in `Login.jsx` / `Register.jsx` currently just navigate to `/app/dashboard` —
-swap that for a real POST to your Flask auth endpoint.
+- `src/services/api.js` is the only place that talks to the backend. It adds the
+  JWT, normalises errors, and dispatches `mindguard:unauthorized` when the token
+  is rejected so `AuthContext` can clear the session.
+- `AuthContext` validates the stored token with `GET /api/me` on load, keeps the
+  cached user when the device is offline, and exposes `refreshUser`.
+- The router base comes from `import.meta.env.BASE_URL`, so the same build works
+  at `/` and at `/mindguard/`.
+- `public/404.html` redirects GitHub Pages deep links back into the SPA and
+  stores the intended path in `sessionStorage`.
+- Every score shown in the UI is a **health** score (higher is better) except
+  burnout, which is explicitly inverted in trend labels.
+- Settings saves are debounced, and planner actions are optimistic with rollback
+  on API failure.
+- The interface is dark-only by design.

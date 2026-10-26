@@ -22,13 +22,33 @@ def _database_uri():
     return "sqlite:///" + str(INSTANCE_DIR / "mindguard.db")
 
 
+# Origins the browser UI is served from. These are always allowed because the
+# deployed frontend is a static site on a different origin from the API; without
+# them every request fails the browser CORS preflight.
+DEFAULT_CORS_ORIGINS = (
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://neon-niru.github.io",
+)
+
+
 def _cors_origins():
-    raw = os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173",
-    )
-    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
-    return origins or ["http://localhost:5173"]
+    raw = (os.getenv("CORS_ORIGINS") or "").strip()
+
+    # "*" disables origin restrictions (useful for throwaway previews).
+    if raw == "*":
+        return "*"
+
+    # CORS_ORIGINS is additive: extra environments (a custom domain, a preview
+    # deployment) can be listed without dropping the built-in origins.
+    origins = list(DEFAULT_CORS_ORIGINS)
+
+    for origin in raw.split(","):
+        origin = origin.strip().rstrip("/")
+        if origin and origin not in origins:
+            origins.append(origin)
+
+    return origins
 
 
 class Config:

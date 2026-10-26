@@ -48,7 +48,7 @@ deterministic engine, so the same facts always produce the same report.
 
 ```
 .
-├── .github/workflows/deploy.yml     # Builds frontend and publishes to gh-pages
+├── .github/workflows/deploy.yml     # Tests backend, builds frontend, deploys to Pages
 ├── mindguard-backend/
 │   ├── app.py                       # create_app() factory, error handlers, migrations
 │   ├── config.py                    # Env-driven configuration
@@ -238,7 +238,7 @@ Backend (`mindguard-backend/.env`):
 | `GROQ_MODEL` | `llama-3.1-8b-instant` | Interview model |
 | `LLM_PROVIDER` | `groq` | `groq`, `openrouter`, or `hf` |
 | `DATABASE_URL` | SQLite in `instance/` | `postgres://` is normalised to `postgresql://` |
-| `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated allowed origins |
+| `CORS_ORIGINS` | localhost + `https://neon-niru.github.io` | **Additional** comma-separated origins; the built-in dev + GitHub Pages origins are always allowed. `*` allows any origin |
 | `JWT_EXPIRES_DAYS` | `30` | Token lifetime |
 | `RETURN_RESET_TOKEN` | `false` | Demo mode: return the reset token from `/forgot-password` because no mail provider is configured |
 | `PORT` | `5000` | Development port |
@@ -254,14 +254,17 @@ Frontend (`mindguard-frontend/.env.production`):
 
 ## Deployment
 
-- **Frontend** — `.github/workflows/deploy.yml` builds on pushes to `main` or
-  `backup-f71dc85` and publishes `mindguard-frontend/dist` to the `gh-pages`
-  branch. The Vite base is `/mindguard/`, and `public/404.html` redirects deep
-  links back into the SPA.
+- **Frontend** — `.github/workflows/deploy.yml` runs the backend tests, builds
+  the app on pushes to `main` or `backup-f71dc85`, and deploys
+  `mindguard-frontend/dist` through GitHub Pages (`actions/deploy-pages`). The
+  repository's Pages source must be set to **GitHub Actions**; publishing to a
+  `gh-pages` branch alone does not update the site. The Vite base is
+  `/mindguard/`, and `public/404.html` redirects deep links back into the SPA.
 - **Backend** — the included `Procfile` runs
   `waitress-serve --port=$PORT app:app`. On Render, set `SECRET_KEY`,
-  `GROQ_API_KEY`, `DATABASE_URL`, `CORS_ORIGINS`, and (for the demo)
-  `RETURN_RESET_TOKEN=true`. `psycopg2-binary` is included for PostgreSQL.
+  `GROQ_API_KEY`, `DATABASE_URL`, and (for the demo) `RETURN_RESET_TOKEN=true`.
+  `CORS_ORIGINS` is only needed for extra origins — the hosted frontend origin
+  is allowed by default. `psycopg2-binary` is included for PostgreSQL.
 - On startup `create_app()` runs `db.create_all()` plus additive schema upgrades
   for columns added after the first release.
 

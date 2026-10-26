@@ -6,6 +6,7 @@ from unittest.mock import patch
 os.environ["MINDGUARD_DEFER_APP"] = "1"
 
 from app import create_app  # noqa: E402
+from config import _cors_origins  # noqa: E402
 from database.db import db  # noqa: E402
 from models.assessment import BurnoutAssessment  # noqa: E402
 from models.interview import InterviewSession  # noqa: E402
@@ -471,6 +472,80 @@ class ApiTestCase(unittest.TestCase):
         response = self.client.get("/api/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["status"], "ok")
+
+
+class CorsTestCase(unittest.TestCase):
+    """The deployed frontend is a static site on a different origin."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        database_path = os.path.join(self.temp_dir, "cors.db")
+        self.app = create_app({
+            "TESTING": True,
+            "SECRET_KEY": "test-secret",
+            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{database_path}",
+            # Use the real default resolution instead of an explicit list.
+            "CORS_ORIGINS": _cors_origins(),
+        })
+        self.client = self.app.test_client()
+
+    def tearDown(self):
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+            db.engine.dispose()
+
+    def test_defaults_include_hosted_frontend(self):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("CORS_ORIGINS", None)
+            origins = _cors_origins()
+
+        self.assertIn("https://neon-niru.github.io", origins)
+        self.assertIn("http://localhost:5173", origins)
+
+    def test_env_origins_are_additive_and_normalised(self):
+        with patch.dict(
+            os.environ,
+            {"CORS_ORIGINS": "https://app.example.com/ , https://staging.example.com"},
+            clear=False,
+        ):
+            origins = _cors_origins()
+
+        self.assertIn("https://app.example.com", origins)
+        self.assertIn("https://staging.example.com", origins)
+        self.assertIn("https://neon-niru.github.io", origins)
+
+    def test_wildcard_disables_origin_restrictions(self):
+        with patch.dict(os.environ, {"CORS_ORIGINS": "*"}, clear=False):
+            self.assertEqual(_cors_origins(), "*")
+
+    def test_preflight_allows_hosted_frontend(self):
+        response = self.client.options(
+            "/api/interview",
+            headers={
+                "Origin": "https://neon-niru.github.io",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "authorization,content-type",
+            },
+        )
+
+        self.assertLess(response.status_code, 400)
+        self.assertEqual(
+            response.headers.get("Access-Control-Allow-Origin"),
+            "https://neon-niru.github.io",
+        )
+
+    def test_simple_request_echoes_origin(self):
+        response = self.client.get(
+            "/api/health",
+            headers={"Origin": "https://neon-niru.github.io"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers.get("Access-Control-Allow-Origin"),
+            "https://neon-niru.github.io",
+        )
 
 
 if __name__ == "__main__":

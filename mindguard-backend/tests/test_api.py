@@ -379,6 +379,48 @@ class ApiTestCase(unittest.TestCase):
         self.assertTrue(data["session_id"])
         self.assertTrue(data["reply"])
 
+    @patch("ai_engine.conversation_manager.ask_llm", return_value=None)
+    def test_interview_resumes_and_binds_terse_answers(self, _mock):
+        headers = self.auth_headers()
+
+        first = self.client.post("/api/interview", headers=headers, json={
+            "message": "hey",
+        })
+        self.assertEqual(first.status_code, 200)
+        first_payload = first.get_json()
+        self.assertFalse(first_payload["complete"])
+
+        second = self.client.post("/api/interview", headers=headers, json={
+            "message": "5 hours",
+            "session_id": first_payload["session_id"],
+        })
+        self.assertEqual(second.status_code, 200)
+        second_payload = second.get_json()
+        self.assertNotEqual(first_payload["reply"], second_payload["reply"])
+
+        # "5 hours" answers the academic-load question that was just asked,
+        # even though the extractor only sees a number.
+        with self.app.app_context():
+            session = db.session.get(
+                InterviewSession, first_payload["session_id"]
+            )
+            self.assertEqual(
+                session.collected_facts["academic_load"]["study_hours"],
+                5,
+            )
+
+        third = self.client.post("/api/interview", headers=headers, json={
+            "message": "about 6 hours",
+            "session_id": first_payload["session_id"],
+        })
+        self.assertEqual(third.status_code, 200)
+
+        with self.app.app_context():
+            session = db.session.get(
+                InterviewSession, first_payload["session_id"]
+            )
+            self.assertEqual(session.collected_facts["sleep"]["hours"], 6)
+
     # ------------------------------------------------------------------
     # IDOR protection
     # ------------------------------------------------------------------

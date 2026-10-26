@@ -98,7 +98,25 @@ ACADEMIC_TRIGGERS = [
 ]
 
 
-def extract_facts(text: str):
+def extract_facts(text: str, topic=None, latest=None):
+    facts = _extract_from_text(text)
+
+    # Give a short answer the context of the question it answers, e.g.
+    # "how is your study load?" -> "heavy". This only applies when the message
+    # itself reported nothing: a message that already names a topic ("I can't
+    # focus") is answered from its own words, not the question.
+    if topic and latest and not _extract_from_text(latest):
+        for category, values in extract_contextual(latest, topic).items():
+            target = facts.setdefault(category, {})
+            if not isinstance(target, dict):
+                continue
+            for field, value in values.items():
+                target.setdefault(field, value)
+
+    return facts
+
+
+def _extract_from_text(text: str):
     facts = {}
     text = text or ""
     sentences = _sentences(text)
@@ -538,6 +556,369 @@ def extract_facts(text: str):
             facts["exercise"] = {"physical_activity": "Sometimes"}
 
     return facts
+
+
+# ---------------------------------------------------------------------------
+# Contextual answers
+# ---------------------------------------------------------------------------
+#
+# Students answer questions with fragments: "ok", "heavy", "5 hours". Those
+# carry meaning only relative to the question that was just asked, so the
+# conversation passes the asked topic in. Nothing is invented: a fragment is
+# only interpreted for the topic the student was just asked about, and never
+# when the message already reported something explicitly.
+
+TERSE_WORD_LIMIT = 12
+
+# Phrases are matched as whole words; the last one mentioned wins, which keeps
+# corrections ("not bad, actually good") pointing at the latest statement.
+BUCKET_SYNONYMS = [
+    ("not really", "rarely"),
+    ("not much", "low"),
+    ("not good", "poor"),
+    ("no idea", "unknown"),
+    ("on and off", "sometimes"),
+    ("up and down", "fair"),
+    ("sort of", "fair"),
+    ("kind of", "fair"),
+    ("i guess", "fair"),
+    ("so so", "fair"),
+    ("under control", "good"),
+    ("on top of", "good"),
+    ("can't focus", "poor"),
+    ("cannot focus", "poor"),
+    ("can't cope", "poor"),
+    ("cannot cope", "poor"),
+    ("out of control", "poor"),
+    ("too much", "high"),
+    ("every day", "always"),
+    ("all the time", "always"),
+
+    ("great", "good"),
+    ("good", "good"),
+    ("well", "good"),
+    ("fine", "good"),
+    ("okay", "fair"),
+    ("ok", "fair"),
+    ("alright", "fair"),
+    ("decent", "fair"),
+    ("manageable", "good"),
+    ("balanced", "good"),
+    ("healthy", "good"),
+    ("focused", "good"),
+    ("motivated", "good"),
+    ("supported", "good"),
+    ("regular", "good"),
+
+    ("fair", "fair"),
+    ("moderate", "fair"),
+    ("average", "fair"),
+    ("medium", "fair"),
+    ("mixed", "fair"),
+    ("steady", "fair"),
+
+    ("bad", "poor"),
+    ("poor", "poor"),
+    ("terrible", "poor"),
+    ("awful", "poor"),
+    ("horrible", "poor"),
+    ("miserable", "poor"),
+    ("struggling", "poor"),
+    ("behind", "poor"),
+    ("messy", "poor"),
+    ("irregular", "poor"),
+    ("distracted", "poor"),
+    ("unmotivated", "poor"),
+    ("exhausted", "poor"),
+    ("drained", "poor"),
+    ("overwhelmed", "poor"),
+    ("addicted", "poor"),
+    ("lonely", "poor"),
+    ("alone", "poor"),
+
+    ("heavy", "high"),
+    ("intense", "high"),
+    ("packed", "high"),
+    ("severe", "high"),
+    ("extreme", "high"),
+    ("very", "high"),
+    ("extremely", "high"),
+    ("high", "high"),
+    ("loads", "high"),
+    ("a lot", "often"),
+
+    ("low", "low"),
+    ("little", "low"),
+    ("mild", "low"),
+    ("barely", "low"),
+    ("hardly", "low"),
+
+    ("always", "always"),
+    ("constantly", "always"),
+    ("often", "often"),
+    ("frequently", "often"),
+    ("usually", "often"),
+    ("sometimes", "sometimes"),
+    ("occasionally", "sometimes"),
+    ("rarely", "rarely"),
+    ("seldom", "rarely"),
+    ("never", "never"),
+    ("none", "never"),
+    ("nothing", "never"),
+
+    ("yes", "yes"),
+    ("yeah", "yes"),
+    ("yep", "yes"),
+    ("sure", "yes"),
+    ("no", "no"),
+]
+
+# topic -> bucket -> (schema field, ordinal label accepted by the engine)
+CONTEXT_TARGETS = {
+    "academic_load": {
+        "high": ("homework_load", "Heavy"),
+        "fair": ("homework_load", "Moderate"),
+        "good": ("homework_load", "Light"),
+        "low": ("homework_load", "Light"),
+        "never": ("homework_load", "Light"),
+        "poor": ("homework_load", "Heavy"),
+    },
+    "sleep": {
+        "good": ("quality", "Good"),
+        "fair": ("quality", "Fair"),
+        "poor": ("quality", "Poor"),
+    },
+    "stress": {
+        "high": ("stress_frequency", "High"),
+        "poor": ("stress_frequency", "High"),
+        "fair": ("stress_frequency", "Moderate"),
+        "good": ("stress_frequency", "Low"),
+        "low": ("stress_frequency", "Low"),
+        "never": ("stress_frequency", "Low"),
+    },
+    "motivation": {
+        "high": ("study_motivation", "Good"),
+        "good": ("study_motivation", "Good"),
+        "yes": ("study_motivation", "Good"),
+        "fair": ("study_motivation", "Moderate"),
+        "low": ("study_motivation", "Low"),
+        "poor": ("study_motivation", "Low"),
+        "never": ("study_motivation", "Low"),
+        "no": ("study_motivation", "Low"),
+    },
+    "mood": {
+        "good": ("positive_mood", "Good"),
+        "fair": ("positive_mood", "Fair"),
+        "poor": ("positive_mood", "Poor"),
+        "low": ("positive_mood", "Poor"),
+    },
+    "cognitive": {
+        "good": ("concentration", "Good"),
+        "fair": ("concentration", "Fair"),
+        "poor": ("concentration", "Poor"),
+        "low": ("concentration", "Poor"),
+    },
+    "lifestyle": {
+        "good": ("daily_routine", "Good"),
+        "fair": ("daily_routine", "Fair"),
+        "poor": ("daily_routine", "Poor"),
+    },
+    "time_management": {
+        "good": ("planning", "Good"),
+        "fair": ("planning", "Fair"),
+        "poor": ("planning", "Poor"),
+        "never": ("planning", "Poor"),
+    },
+    "social_support": {
+        "good": ("support_availability", "Available"),
+        "yes": ("support_availability", "Available"),
+        "fair": ("support_availability", "Sometimes"),
+        "sometimes": ("support_availability", "Sometimes"),
+        "low": ("support_availability", "Low"),
+        "poor": ("support_availability", "Low"),
+        "never": ("support_availability", "Low"),
+        "no": ("support_availability", "Low"),
+    },
+    "digital_behaviour": {
+        "good": ("screen_time_control", "Good"),
+        "fair": ("screen_time_control", "Fair"),
+        "poor": ("screen_time_control", "Poor"),
+        "high": ("screen_time_control", "Poor"),
+    },
+    "recent_life_events": {
+        "high": ("major_changes", "Major"),
+        "poor": ("major_changes", "Major"),
+        "yes": ("major_changes", "Major"),
+        "fair": ("major_changes", "Minor"),
+        "never": ("major_changes", "None"),
+        "no": ("major_changes", "None"),
+        "good": ("major_changes", "None"),
+    },
+    "emotional_exhaustion": {
+        "always": ("feeling_drained", "Always"),
+        "often": ("feeling_drained", "Often"),
+        "high": ("feeling_drained", "Often"),
+        "poor": ("feeling_drained", "Often"),
+        "yes": ("feeling_drained", "Often"),
+        "sometimes": ("feeling_drained", "Sometimes"),
+        "fair": ("feeling_drained", "Sometimes"),
+        "rarely": ("feeling_drained", "Rarely"),
+        "low": ("feeling_drained", "Rarely"),
+        "never": ("feeling_drained", "Rarely"),
+        "no": ("feeling_drained", "Rarely"),
+        "good": ("feeling_drained", "Rarely"),
+    },
+    "burnout_symptoms": {
+        "always": ("overwhelmed", "Always"),
+        "often": ("overwhelmed", "Often"),
+        "high": ("overwhelmed", "Often"),
+        "poor": ("overwhelmed", "Often"),
+        "yes": ("overwhelmed", "Often"),
+        "sometimes": ("overwhelmed", "Sometimes"),
+        "fair": ("overwhelmed", "Sometimes"),
+        "rarely": ("overwhelmed", "Rarely"),
+        "low": ("overwhelmed", "Rarely"),
+        "never": ("overwhelmed", "Rarely"),
+        "no": ("overwhelmed", "Rarely"),
+        "good": ("overwhelmed", "Rarely"),
+    },
+    "anxiety": {
+        "always": ("worry_frequency", "Always"),
+        "often": ("worry_frequency", "Often"),
+        "high": ("worry_frequency", "Often"),
+        "yes": ("worry_frequency", "Often"),
+        "sometimes": ("worry_frequency", "Sometimes"),
+        "fair": ("worry_frequency", "Sometimes"),
+        "rarely": ("worry_frequency", "Rarely"),
+        "low": ("worry_frequency", "Rarely"),
+        "never": ("worry_frequency", "Never"),
+        "no": ("worry_frequency", "Never"),
+    },
+    "productivity": {
+        "good": ("task_completion", "Good"),
+        "fair": ("task_completion", "Fair"),
+        "poor": ("task_completion", "Poor"),
+        "low": ("task_completion", "Poor"),
+    },
+    "exercise": {
+        "always": ("physical_activity", "Regular"),
+        "often": ("physical_activity", "Regular"),
+        "high": ("physical_activity", "Regular"),
+        "good": ("physical_activity", "Regular"),
+        "yes": ("physical_activity", "Regular"),
+        "sometimes": ("physical_activity", "Sometimes"),
+        "fair": ("physical_activity", "Sometimes"),
+        "rarely": ("physical_activity", "Rarely"),
+        "low": ("physical_activity", "Rarely"),
+        "never": ("physical_activity", "Never"),
+        "no": ("physical_activity", "Never"),
+    },
+}
+
+HOURS_PATTERN = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(?:-|–|to)?\s*(?:hours?|hrs?|h)\b",
+    re.IGNORECASE,
+)
+
+BARE_NUMBER_PATTERN = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*$")
+
+# Buckets that mean the same thing when a topic has no exact entry. Without
+# this, "not really" or "always" would silently collect nothing.
+BUCKET_ALIASES = {
+    "never": ("low", "rarely"),
+    "rarely": ("low",),
+    "always": ("high",),
+    "often": ("high",),
+    "sometimes": ("fair",),
+    "yes": ("good", "high"),
+    "no": ("low",),
+}
+
+# Longest phrase first so "not good" wins over the "good" inside it.
+_BUCKET_LOOKUP = dict(BUCKET_SYNONYMS)
+_BUCKET_PATTERN = re.compile(
+    r"(?<![a-z])("
+    + "|".join(
+        re.escape(phrase)
+        for phrase, _ in sorted(BUCKET_SYNONYMS, key=lambda item: -len(item[0]))
+    )
+    + r")(?![a-z])"
+)
+
+
+def _last_bucket(text):
+    """Return the bucket of the last recognised phrase in the text."""
+    bucket = None
+
+    for match in _BUCKET_PATTERN.finditer((text or "").lower()):
+        bucket = _BUCKET_LOOKUP.get(match.group(1))
+
+    return bucket
+
+
+def _topic_target(topic, bucket):
+    targets = CONTEXT_TARGETS.get(topic, {})
+
+    if bucket in targets:
+        return targets[bucket]
+
+    for alias in BUCKET_ALIASES.get(bucket, ()):
+        if alias in targets:
+            return targets[alias]
+
+    return None
+
+
+def _hours_answer(category, text):
+    match = HOURS_PATTERN.search(text)
+
+    if match:
+        value = float(match.group(1))
+    else:
+        bare = BARE_NUMBER_PATTERN.match(text)
+        if not bare:
+            return None
+        value = float(bare.group(1))
+
+    if value < 0 or value > 24:
+        return None
+
+    if category == "sleep":
+        return max(3.0, min(10.0, value))
+
+    if category == "academic_load":
+        return max(0.0, min(16.0, value))
+
+    return None
+
+
+def extract_contextual(message, topic):
+    """Interpret a short answer in the context of the question just asked."""
+    if not topic or topic not in CONTEXT_TARGETS:
+        return {}
+
+    text = (message or "").strip()
+    if not text:
+        return {}
+
+    # Longer messages have their own keywords and are handled by the main
+    # extractor; binding them to the asked topic would misattribute them.
+    if len(text.split()) > TERSE_WORD_LIMIT:
+        return {}
+
+    values = {}
+
+    hours = _hours_answer(topic, text)
+    if hours is not None:
+        field = "hours" if topic == "sleep" else "study_hours"
+        values[field] = hours
+
+    target = _topic_target(topic, _last_bucket(text))
+    if target:
+        field, label = target
+        values.setdefault(field, label)
+
+    return {topic: values} if values else {}
 
 
 def clean_json(output):

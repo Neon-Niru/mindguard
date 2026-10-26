@@ -1,3 +1,4 @@
+import copy
 import json
 from flask import Blueprint, request, jsonify
 from database.db import db
@@ -8,7 +9,7 @@ from models.planner import PlannerTask
 from models.settings import UserSettings
 from engine.burnout_engine import BurnoutEngine
 from ai_engine.conversation_manager import process_message
-from ai_engine.llm_connector import FALLBACK_QUESTIONS_MAP
+from ai_engine.fallback import derive_progress
 from ai_engine.state_manager import (
     create_state,
     REQUIRED_INTERVIEW_CATEGORIES,
@@ -33,12 +34,21 @@ def _load_history(session):
 
 
 def _build_state(session):
-    collected = session.collected_facts or {}
+    # Deep-copy the stored facts. Assigning the loaded JSON object straight
+    # back to the column would not look modified to SQLAlchemy, so answers
+    # collected on later turns of a resumed interview were silently lost.
+    collected = copy.deepcopy(session.collected_facts or {})
+    history = _load_history(session)
+    asked, last_question, last_topic = derive_progress(history)
+
     return {
         "data": collected,
         "completed": list(collected.keys()),
         "missing": _recalculate_missing(collected),
-        "history": _load_history(session),
+        "history": history,
+        "asked": asked,
+        "last_question": last_question,
+        "last_topic": last_topic,
     }
 
 
@@ -147,16 +157,11 @@ def interview():
         is_finished = True
 
     if not is_finished:
-        reply = ai_result.get("reply")
-        if not reply:
-            missing = state.get("missing", [])
-            if missing:
-                reply = FALLBACK_QUESTIONS_MAP.get(
-                    missing[0],
-                    "Tell me more about how you've been feeling.",
-                )
-            else:
-                reply = "I think I have enough information now."
+        # process_message always supplies a reply while the interview is
+        # unfinished; this is only a defensive fallback.
+        reply = ai_result.get("reply") or (
+            "Tell me a little more about how things have been for you."
+        )
 
         return jsonify({
             "complete": False,

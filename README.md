@@ -225,6 +225,21 @@ If no usable facts were collected, the API returns `422` and keeps the session
 open so the student can add more detail. A completed session returns `409`;
 start a new conversation instead.
 
+### Offline interviewer
+
+The LLM is optional. Without an API key (or if the provider fails),
+`ai_engine/fallback.py` runs the same interview deterministically:
+
+- each category has two phrasings, and the next topic is the least-asked one,
+  so no question is repeated twice in a row;
+- a short answer ("ok", "heavy", "5 hours") is interpreted in the context of
+  the question just asked, and only when the message itself reports nothing;
+- a confused reply ("huh?", "why are you asking that again?") gets an
+  explanation of why that topic matters, then the same topic is re-asked in
+  its other phrasing (up to three probes, then the interview moves on);
+- rotation state is reconstructed from the stored transcript, so it survives
+  a page reload and needs no schema change.
+
 ---
 
 ## Configuration

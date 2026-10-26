@@ -46,6 +46,7 @@ mindguard-backend/
 │   ├── conversation_manager.py # prompt + state + completion decision
 │   ├── prompt_builder.py       # tone-aware prompt
 │   ├── extractor.py            # explicit-fact extraction only (no fabrication)
+│   ├── fallback.py             # deterministic interviewer (rotation, confusion)
 │   └── state_manager.py        # categories/state helpers
 ├── utils/
 │   ├── auth.py                 # JWT create/decode, jwt_required (rejects deleted users)

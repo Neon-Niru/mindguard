@@ -66,7 +66,15 @@ def create_state():
 
         "missing": REQUIRED_INTERVIEW_CATEGORIES.copy(),
 
-        "history": []
+        "history": [],
+
+        # Interviewer rotation state. It is also derived from the stored
+        # transcript when a session is resumed, so it needs no schema change.
+        "asked": {},
+
+        "last_question": "",
+
+        "last_topic": None,
 
     }
 

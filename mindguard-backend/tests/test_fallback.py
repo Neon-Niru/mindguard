@@ -79,6 +79,24 @@ class FallbackQuestionTests(unittest.TestCase):
         self.assertEqual(last_topic, "sleep")
         self.assertEqual(last_question, QUESTION_VARIANTS["sleep"][1])
 
+    def test_derive_progress_understands_prefixed_questions(self):
+        history = [
+            {"role": "assistant", "content": QUESTION_VARIANTS["sleep"][0]},
+            {
+                "role": "assistant",
+                "content": (
+                    "That one helps me understand sleep. "
+                    + QUESTION_VARIANTS["sleep"][1]
+                ),
+            },
+        ]
+
+        asked, last_question, last_topic = derive_progress(history)
+
+        self.assertEqual(asked, {"sleep": 2})
+        self.assertEqual(last_topic, "sleep")
+        self.assertEqual(last_question, QUESTION_VARIANTS["sleep"][1])
+
     def test_confusion_detection_uses_whole_words(self):
         self.assertTrue(looks_confused("huh"))
         self.assertTrue(looks_confused("why are you asking that again"))
@@ -203,6 +221,19 @@ class FallbackConversationTests(unittest.TestCase):
             state["data"]["academic_load"]["homework_load"],
             "Heavy",
         )
+
+    def test_repeated_confusion_does_not_repeat_the_question(self):
+        _, state = self._say("hey", create_state())
+        replies = []
+
+        for _ in range(3):
+            reply, state = self._say("huh", state)
+            self.assertTrue(
+                reply.startswith("That one helps me understand"),
+                reply,
+            )
+            self.assertNotEqual(reply, replies[-1] if replies else None)
+            replies.append(reply)
 
 
 if __name__ == "__main__":

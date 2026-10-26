@@ -115,12 +115,37 @@ _TOPIC_BY_QUESTION = {
     for question in variants
 }
 
+_QUESTIONS_LONGEST_FIRST = tuple(
+    sorted(_TOPIC_BY_QUESTION, key=len, reverse=True)
+)
+
+
+def _matched_question(text):
+    """Return the known question contained in a reply, if any.
+
+    Confusion handling prefixes an explanation to the question ("That one
+    helps me understand... Do you wake up..."), and the LLM may add its own
+    wording, so the question is matched at the end rather than exactly.
+    """
+    if not isinstance(text, str):
+        return None
+
+    stripped = text.strip()
+
+    if stripped in _TOPIC_BY_QUESTION:
+        return stripped
+
+    for question in _QUESTIONS_LONGEST_FIRST:
+        if stripped.endswith(question):
+            return question
+
+    return None
+
 
 def topic_for_question(text):
     """Return the category a known question belongs to, if any."""
-    if not isinstance(text, str):
-        return None
-    return _TOPIC_BY_QUESTION.get(text.strip())
+    question = _matched_question(text)
+    return _TOPIC_BY_QUESTION.get(question) if question else None
 
 
 def derive_progress(history):
@@ -138,11 +163,12 @@ def derive_progress(history):
             continue
 
         content = (item.get("content") or "").strip()
-        category = _TOPIC_BY_QUESTION.get(content)
+        question = _matched_question(content)
 
-        if category:
+        if question:
+            category = _TOPIC_BY_QUESTION[question]
             asked[category] = asked.get(category, 0) + 1
-            last_question = content
+            last_question = question
             last_topic = category
 
     return asked, last_question, last_topic

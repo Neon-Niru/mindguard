@@ -20,33 +20,83 @@ _FALLBACK_QUESTIONS = [
     "Tell me about your daily routine.",
 ]
 
+FALLBACK_QUESTIONS_MAP = {
+    "sleep": "How has your sleep been this week?",
+    "academic_load": "How are your studies going?",
+    "emotional_exhaustion": "Have you been feeling emotionally drained?",
+    "motivation": "How is your motivation for studying these days?",
+    "cognitive": "How is your concentration and memory?",
+    "stress": "How would you rate your stress level?",
+    "anxiety": "Do you find yourself worrying often?",
+    "mood": "How has your mood been lately?",
+    "productivity": "How productive have you been feeling?",
+    "time_management": "How well are you managing your time?",
+    "social_support": "Do you have people you can talk to?",
+    "lifestyle": "How is your daily routine?",
+    "digital_behaviour": "How is your screen time?",
+    "burnout_symptoms": "Have you been feeling overwhelmed?",
+    "recent_life_events": "Have there been any major changes recently?",
+    "exercise": "Are you getting any physical activity?",
+}
+
+
+def _build_hf_prompt(messages):
+    system_parts = []
+    user_message = ""
+    for msg in messages:
+        if msg["role"] == "system":
+            system_parts.append(msg["content"])
+        elif msg["role"] == "user":
+            user_message = msg["content"]
+    system_text = "\n\n".join(system_parts)
+    return f"<s>[INST] {system_text}\n\n{user_message} [/INST]"
+
 
 def ask_llm(messages, state=None):
     provider = os.getenv("LLM_PROVIDER", "groq").lower()
     api_key = os.getenv(f"{provider.upper()}_API_KEY")
 
+    # Hugging Face Inference API
+    if provider in ("hf", "huggingface"):
+        if not api_key:
+            if state and state.get("missing"):
+                cat = state["missing"][0]
+                return FALLBACK_QUESTIONS_MAP.get(cat, "Tell me more about how you've been feeling.")
+            return "Thank you for sharing. I think I have enough information now."
+
+        model = os.getenv("HF_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
+        api_url = f"https://api-inference.huggingface.co/models/{model}"
+
+        prompt = _build_hf_prompt(messages)
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 512,
+                "temperature": 0.8,
+                "return_full_text": False,
+            },
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            response = requests.post(api_url, json=payload, headers=headers, timeout=60)
+            response.raise_for_status()
+        except requests.RequestException as error:
+            raise Exception(f"LLM request failed: {error}")
+
+        data = response.json()
+        try:
+            return data[0][0]["generated_text"]
+        except (KeyError, IndexError, TypeError):
+            raise Exception("Invalid LLM response format")
+
     if not api_key:
         if state and state.get("missing"):
             cat = state["missing"][0]
-            questions = {
-                "sleep": "How has your sleep been this week?",
-                "academic_load": "How are your studies going?",
-                "emotional_exhaustion": "Have you been feeling emotionally drained?",
-                "motivation": "How is your motivation for studying these days?",
-                "cognitive": "How is your concentration and memory?",
-                "stress": "How would you rate your stress level?",
-                "anxiety": "Do you find yourself worrying often?",
-                "mood": "How has your mood been lately?",
-                "productivity": "How productive have you been feeling?",
-                "time_management": "How well are you managing your time?",
-                "social_support": "Do you have people you can talk to?",
-                "lifestyle": "How is your daily routine?",
-                "digital_behaviour": "How is your screen time?",
-                "burnout_symptoms": "Have you been feeling overwhelmed?",
-                "recent_life_events": "Have there been any major changes recently?",
-                "exercise": "Are you getting any physical activity?",
-            }
-            return questions.get(cat, "Tell me more about how you've been feeling.")
+            return FALLBACK_QUESTIONS_MAP.get(cat, "Tell me more about how you've been feeling.")
         return "Thank you for sharing. I think I have enough information now."
 
     if provider == "openrouter":
@@ -54,12 +104,12 @@ def ask_llm(messages, state=None):
         model = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct")
     else:
         api_url = os.getenv("GROQ_URL", DEFAULT_GROQ_URL)
-        model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 
     payload = {
         "model": model,
         "messages": messages,
-        "temperature": 0.3,
+        "temperature": 0.8,
     }
 
     headers = {

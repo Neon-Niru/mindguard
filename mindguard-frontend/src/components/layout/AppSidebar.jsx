@@ -34,7 +34,7 @@ export default function AppSidebar() {
   return (
     <aside className="hidden md:flex flex-col w-64 shrink-0 h-screen sticky top-0 p-5">
       <div className="glass rounded-2xl flex flex-col h-full p-4">
-        <button onClick={() => navigate('/')} className="flex items-center gap-2.5 px-2 py-2 mb-6">
+        <button onClick={() => navigate('/app/dashboard')} className="flex items-center gap-2.5 px-2 py-2 mb-6">
           <span className="w-9 h-9 rounded-xl bg-brand-gradient flex items-center justify-center">
             <Brain size={18} className="text-white" />
           </span>

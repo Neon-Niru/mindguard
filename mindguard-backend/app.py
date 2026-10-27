@@ -25,7 +25,7 @@ from routes.assessment import assessment_bp
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Enable CORS for all domains so your GitHub Pages frontend can connect freely
+# Enable CORS for all incoming connections (including your GitHub Pages site)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 db.init_app(app)

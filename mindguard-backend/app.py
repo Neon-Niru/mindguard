@@ -1,3 +1,4 @@
+import os
 from flask import Flask
 from flask_cors import CORS
 
@@ -24,7 +25,8 @@ from routes.assessment import assessment_bp
 app = Flask(__name__)
 app.config.from_object(Config)
 
-CORS(app)
+# Enable CORS for all domains so your GitHub Pages frontend can connect freely
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 db.init_app(app)
 bcrypt.init_app(app)
@@ -51,4 +53,11 @@ with app.app_context():
     db.create_all()
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    try:
+        from waitress import serve
+        print(f"Starting Waitress production server on port {port}...")
+        serve(app, host="0.0.0.0", port=port)
+    except ImportError:
+        print(f"Starting Flask development server on port {port}...")
+        app.run(host="0.0.0.0", port=port, debug=True)

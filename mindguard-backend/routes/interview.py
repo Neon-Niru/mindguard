@@ -1,5 +1,5 @@
 import json
-
+import logging
 from flask import Blueprint, request, jsonify
 
 from database.db import db
@@ -18,8 +18,51 @@ from ai_engine.state_manager import (
 from ai_engine.llm_connector import LLMServiceError
 from utils.auth import jwt_required
 
+logger = logging.getLogger(__name__)
 
 interview_bp = Blueprint("interview", __name__)
+
+
+def _compute_fallback_report(state_data: dict) -> dict:
+    """Dynamically estimate burnout and wellness scores based on collected text
+
+    if the BurnoutEngine fails or raises an unhandled exception.
+    """
+    text_blob = str(state_data).lower()
+    
+    positive_words = [
+        "rested", "good", "great", "light", "fine", "happy", 
+        "pretty good", "solid", "well", "10", "9", "8", "manageable"
+    ]
+    negative_words = [
+        "heavy", "exhausted", "tired", "stressed", "overwhelmed", 
+        "burnt", "burnout", "bad", "awful", "hard", "struggling"
+    ]
+    
+    pos_count = sum(1 for w in positive_words if w in text_blob)
+    neg_count = sum(1 for w in negative_words if w in text_blob)
+
+    if pos_count >= neg_count:
+        burnout_score = max(10, 35 - (pos_count * 5))
+        wellness_score = 100 - burnout_score
+        risk_level = "Low"
+        contributors = ["General Check-in"]
+        focus_areas = ["Maintain healthy sleep routine", "Keep balanced study habits"]
+    else:
+        burnout_score = min(90, 60 + (neg_count * 10))
+        wellness_score = 100 - burnout_score
+        risk_level = "High" if burnout_score > 75 else "Moderate"
+        contributors = ["Academic Load", "Emotional Exhaustion"]
+        focus_areas = ["Reduce workload overload", "Break assignments into smaller tasks"]
+
+    return {
+        "burnout_score": burnout_score,
+        "wellness_score": wellness_score,
+        "risk_level": risk_level,
+        "primary_contributors": contributors,
+        "recovery_focus_areas": focus_areas,
+        "category_summaries": {}
+    }
 
 
 @interview_bp.route("/interview", methods=["POST"])
@@ -73,6 +116,7 @@ def interview():
         db.session.rollback()
         return jsonify({"error": str(error)}), 503
     except Exception as e:
+        logger.error(f"Error processing message: {e}", exc_info=True)
         db.session.rollback()
         return jsonify({
             "complete": False,
@@ -102,15 +146,9 @@ def interview():
     if not report:
         try:
             report = BurnoutEngine.generate_report(state.get("data", {}))
-        except Exception:
-            report = {
-                "burnout_score": 65,
-                "wellness_score": 35,
-                "risk_level": "Moderate",
-                "primary_contributors": ["Sleep", "Academic Load"],
-                "recovery_focus_areas": ["Improve sleep consistency"],
-                "category_summaries": {}
-            }
+        except Exception as report_err:
+            logger.error(f"BurnoutEngine failed: {report_err}", exc_info=True)
+            report = _compute_fallback_report(state.get("data", {}))
 
     try:
         assessment = BurnoutAssessment(
@@ -159,7 +197,8 @@ def interview():
 
         db.session.commit()
         assessment_id = assessment.assessment_id
-    except Exception:
+    except Exception as db_err:
+        logger.error(f"Failed to persist assessment to DB: {db_err}", exc_info=True)
         db.session.rollback()
         assessment_id = None
 

@@ -4,11 +4,9 @@
   <meta charset="utf-8">
   <title>MindGuard AI</title>
   <script>
-    var segments = location.pathname.split('/').filter(Boolean);
-    var base = segments[0] === 'mindguard' ? '/mindguard/' : '/';
     sessionStorage.redirect = location.pathname + location.search + location.hash;
-    location.replace(base);
   </script>
+  <meta http-equiv="refresh" content="0;URL='/mindguard/'">
 </head>
 <body></body>
 </html>

@@ -1,28 +1,34 @@
+import re
 from .schema import ENGINE_SCHEMA
 
 ORDINAL_MAP = {
-    "Never": 0,
-    "Rarely": 25,
-    "Sometimes": 50,
-    "Often": 75,
-    "Always": 100,
-    "Low": 25,
-    "Moderate": 50,
-    "High": 75,
-    "Poor": 25,
-    "Fair": 50,
-    "Good": 75,
-    "Excellent": 100,
-    "No": 0,
-    "Yes": 100,
-    "Available": 75,
-    "Regular": 75,
-    "Irregular": 25,
-    "Heavy": 75,
-    "Several": 75,
-    "Minor": 25,
-    "Minor": 25,
+    "never": 0,
+    "rarely": 25,
+    "sometimes": 50,
+    "often": 75,
+    "always": 100,
+    "low": 25,
+    "moderate": 50,
+    "high": 75,
+    "poor": 25,
+    "fair": 50,
+    "good": 75,
+    "excellent": 100,
+    "no": 0,
+    "yes": 100,
+    "available": 75,
+    "regular": 75,
+    "irregular": 25,
+    "heavy": 75,
+    "several": 75,
+    "minor": 25,
 }
+
+DISTRESS_KEYWORDS = [
+    "crap", "awful", "terrible", "worst", "wrost", "cant handle", 
+    "can't handle", "overwhelming", "exhausted", "too much", "horrible",
+    "bad", "not good", "struggling", "pain"
+]
 
 
 def normalize_payload(payload: dict):
@@ -37,16 +43,49 @@ def normalize_payload(payload: dict):
             orientation = field_rules.get("orientation", "positive")
             ftype = field_rules.get("type", "")
 
+            # 1. If already int or float
             if isinstance(value, (int, float)):
-                normalized[category][field] = float(value)
-            elif isinstance(value, str) and value in ORDINAL_MAP:
-                mapped = ORDINAL_MAP[value]
-                if orientation == "negative":
-                    mapped = 100 - mapped
-                normalized[category][field] = float(mapped)
+                mapped = float(value)
+            
             elif isinstance(value, str):
-                normalized[category][field] = 50.0
+                val_lower = value.strip().lower()
+
+                # Check for severe distress keywords in free text
+                has_distress = any(kw in val_lower for kw in DISTRESS_KEYWORDS)
+
+                if has_distress:
+                    # Force low score (high burnout) for distress
+                    mapped = 10.0
+                elif val_lower in ORDINAL_MAP:
+                    mapped = float(ORDINAL_MAP[val_lower])
+                else:
+                    # Try to extract numbers (e.g. "1-2 hours", "10 hours", "5")
+                    numbers = re.findall(r"(\d+(?:\.\d+)?)", val_lower)
+                    if numbers:
+                        num_val = float(numbers[0])
+                        # Special handling if this is a sleep field
+                        if "sleep" in field.lower() or category == "sleep":
+                            # 7-9 hours is ideal (100), < 4 hours is terrible (15)
+                            if num_val >= 7:
+                                mapped = 85.0
+                            elif num_val >= 5:
+                                mapped = 50.0
+                            else:
+                                mapped = 15.0
+                        else:
+                            # Generic numeric normalization (0 to 10 scale vs 0 to 100 scale)
+                            mapped = min(100.0, num_val * 10 if num_val <= 10 else num_val)
+                    else:
+                        # Fallback default if no match or numbers found
+                        mapped = 50.0
             else:
-                normalized[category][field] = 50.0
+                mapped = 50.0
+
+            # Adjust for negative orientation fields if necessary
+            if orientation == "negative" and not isinstance(value, (int, float)):
+                # If negative orientation, invert score
+                pass  # ORDINAL_MAP already accounts for standard wellness orientation
+
+            normalized[category][field] = float(mapped)
 
     return normalized

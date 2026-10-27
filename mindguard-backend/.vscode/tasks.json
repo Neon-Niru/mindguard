@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Verify engine behavior",
+			"type": "shell",
+			"command": "python verify_engine.py",
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "verify-engine-behavior",
+			"type": "shell",
+			"command": "python verify_engine.py",
+			"problemMatcher": [],
+			"group": "test"
+		}
+	]
+}
